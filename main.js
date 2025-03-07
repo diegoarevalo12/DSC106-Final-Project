@@ -67,6 +67,19 @@ function processAndStoreData(femTemp, maleTemp, femAct, maleAct) {
     document.getElementById("showMales").addEventListener("click", function () {
         drawLineChart(null, formattedData[currentDataType].male, currentDataType === "temp" ? "Temperature (°C)" : "Activity Level");
     });
+
+    document.getElementById("playPause").addEventListener("click", function () {
+        if (!running) {
+            running = true;
+            d3.select(this).text("Pause");
+            playAnimation();
+        } else {
+            running = false;
+            d3.select(this).text("Play");
+        }
+    });
+
+    drawBarChartRace(femTemp, femAct);
 }
 
 // Ensure tooltip exists only once
@@ -213,3 +226,163 @@ function drawLineChart(femaleData, maleData, yLabel) {
         .attr("fill", "blue")
         .text("Male");
 }
+
+function processBarChartData(femTemp, femAct) {
+    console.log("Raw Temperature Data:", femTemp); 
+    console.log("Raw Activity Data:", femAct); 
+
+    let hourlyData = [];
+    let numHours = femTemp.length / 60; // Convert minute data to hours
+
+    for (let hour = 0; hour < numHours; hour++) {
+        let startIdx = hour * 60, endIdx = (hour + 1) * 60;
+        let dayNumber = Math.floor(hour / 24) + 1; // Calculate the day
+        let hourOfDay = hour % 24; // Hour within the day
+
+        let hourlyAvg = { day: dayNumber, hour: hourOfDay }; // Store Day and Hour Info
+
+        // Calculate mean for each female mouse (Temperature & Activity)
+        Object.keys(femTemp[0]).forEach(mouse => {
+            if (mouse !== "day" && mouse !== "hour") { 
+                hourlyAvg[`${mouse}_temp`] = d3.mean(femTemp.slice(startIdx, endIdx).map(row => row[mouse]));
+                hourlyAvg[`${mouse}_act`] = d3.mean(femAct.slice(startIdx, endIdx).map(row => row[mouse]));
+            }
+        });
+
+        console.log(`Day ${dayNumber}, Hour ${hourOfDay}:`, hourlyAvg); // Debugging
+        hourlyData.push(hourlyAvg);
+    }
+    return hourlyData;
+}
+
+function drawBarChartRace(femTemp, femAct) {
+    const width = 800, height = 700, margin = { top: 50, right: 50, bottom: 50, left: 150 };
+    const barHeight = 20;
+    const numMice = 13;
+    const duration = 1000;
+
+    let hourlyData = processBarChartData(femTemp, femAct);
+    let minTemp = 35, maxTemp = 40;
+    let maxActivity = d3.max(hourlyData, d => d3.max(Object.values(d).filter(v => typeof v === 'number')));
+
+    let svg = d3.select("#chart2")
+        .append("svg")
+        .attr("width", width + margin.left + margin.right)
+        .attr("height", height + margin.top + margin.bottom)
+        .append("g")
+        .attr("transform", `translate(${margin.left}, ${margin.top})`);
+
+    // X Scales for Temperature and Activity
+    let xScaleTemp = d3.scaleLinear().domain([minTemp, maxTemp]).range([0, width / 2]);
+
+    // Find the max activity value dynamically across all hours
+    let maxActivityValue = d3.max(hourlyData, d =>
+        d3.max(Object.keys(d).filter(k => k.includes("_act")).map(k => d[k]))
+    );
+
+    // Adjust xScaleAct to ensure correct proportions
+    let xScaleAct = d3.scaleLinear()
+        .domain([0, maxActivityValue])  // Scale based on the highest activity value
+        .range([0, width - margin.right]);  // Keep it proportional to the width
+
+    let yScale = d3.scaleBand()
+        .domain(d3.range(numMice * 2)) // Multiply by 2 for Temp + Activity
+        .range([0, numMice * 2 * barHeight])
+        .padding(0.1);
+
+    let xAxisTemp = d3.axisBottom(xScaleTemp).tickValues(d3.range(minTemp, maxTemp + 0.5, 0.5)).tickFormat(d => `${d.toFixed(1)}°C`);
+    let xAxisAct = d3.axisBottom(xScaleAct).ticks(5);
+
+    let yAxis = d3.axisLeft(yScale).tickFormat(i => `F${Math.floor(i / 2) + 1} ${i % 2 === 0 ? "Temp" : "Act"}`);
+
+    // svg.append("g").attr("transform", `translate(0,${height})`).call(xAxisTemp);
+    // svg.append("g").attr("transform", `translate(${width / 2},${height})`).call(xAxisAct);
+    svg.append("g").call(yAxis);
+
+    let bars = svg.selectAll(".bar")
+        .data(Object.keys(hourlyData[0]).filter(d => d.includes("_temp") || d.includes("_act")))
+        .enter()
+        .append("rect")
+        .attr("class", "bar")
+        .attr("y", (d, i) => yScale(i))
+        .attr("height", yScale.bandwidth())
+        .attr("fill", d => d.includes("_temp") ? "#FD2C4C" : "#FFA500");
+
+    let labels = svg.selectAll(".label")
+        .data(Object.keys(hourlyData[0]).filter(d => d.includes("_temp") || d.includes("_act")))
+        .enter()
+        .append("text")
+        .attr("class", "label")
+        .attr("y", (d, i) => yScale(i) + yScale.bandwidth() / 2)
+        .attr("dy", ".35em")
+        .attr("text-anchor", "start");
+
+    let hourText = svg.append("text")
+        .attr("x", width - 180)
+        .attr("y", -20)
+        .attr("class", "hour-text")
+        .style("font-size", "18px")
+        .text("Day: 1, Hour: 0");
+
+    let running = false;
+    let currentHour = 0;
+    let interval;
+
+    function update(hour) {
+        let data = hourlyData[hour];
+
+        bars.transition().duration(duration)
+            .attr("width", d => d.includes("_temp") ? xScaleTemp(data[d]) : xScaleAct(data[d]));
+
+        labels.transition().duration(duration)
+            .attr("x", d => {
+                if (d.includes("_temp")) {
+                    return xScaleTemp(data[d]) + 5; // Position slightly right of temperature bars
+                } else {
+                    return xScaleAct(data[d]) + 5; // Push activity labels further to the right
+                }
+            })
+            .attr("y", (d, i) => yScale(i) + yScale.bandwidth() / 2 + 4) // Adjust vertical alignment
+            .text(d => `${data[d].toFixed(2)}${d.includes("_temp") ? "°C" : ""}`);
+        
+
+        let currentDay = data.day;
+        let currentHour = data.hour;
+        hourText.text(`Day: ${currentDay}, Hour: ${currentHour + 1}`);
+    }
+
+    function playAnimation() {
+        if (running) clearInterval(interval);
+        running = true;
+        interval = setInterval(() => {
+            if (currentHour >= hourlyData.length - 1) currentHour = 0;
+            else currentHour++;
+            update(currentHour);
+        }, duration);
+    }
+    
+    // Add this immediately after `playAnimation()`
+    d3.select("#resetButton").on("click", function () {
+        clearInterval(interval); // Stop the animation if running
+        running = false; // Mark animation as stopped
+        currentHour = 0; // Reset to first hour
+        update(currentHour); // Update chart to first hour
+        d3.select("#playPause").text("Play"); // Reset Play button text
+    });
+
+    d3.select("#playPause").on("click", function () {
+        if (running) {
+            clearInterval(interval);
+            running = false;
+            d3.select(this).text("Play");
+        } else {
+            playAnimation();
+            d3.select(this).text("Pause");
+        }
+    });
+
+    update(0);
+}
+
+// Call the function with the processed temperature data
+drawBarChartRace(femTemp, femAct);
