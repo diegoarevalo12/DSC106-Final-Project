@@ -21,11 +21,17 @@ document.addEventListener("DOMContentLoaded", function () {
 let formattedData = { temp: {}, act: {} };
 
 function processAndStoreData(femTemp, maleTemp, femAct, maleAct) {
+    // Default to Female Data First
+    d3.select("#visualization-title").text("The Relationship Between Temperature and Activity: Female Mice");
+
+    // Convert all dataset values to numeric
     [femTemp, maleTemp, femAct, maleAct].forEach(dataset => {
-        dataset.forEach(d => Object.keys(d).forEach(k => d[k] = +d[k]));
+        dataset.forEach(d => {
+            Object.keys(d).forEach(k => d[k] = +d[k]); // Convert values to numeric
+        });
     });
 
-    let numDays = femTemp.length / 1440;
+    let numDays = femTemp.length / 1440; // Total days
 
     ["temp", "act"].forEach((type, index) => {
         let femData = index === 0 ? femTemp : femAct;
@@ -34,6 +40,8 @@ function processAndStoreData(femTemp, maleTemp, femAct, maleAct) {
 
         for (let day = 0; day < numDays; day++) {
             let startIdx = day * 1440, endIdx = (day + 1) * 1440;
+
+            // Calculate mean values per day
             let dailyFemAvg = d3.mean(femData.slice(startIdx, endIdx).map(row => d3.mean(Object.values(row))));
             let dailyMaleAvg = d3.mean(maleData.slice(startIdx, endIdx).map(row => d3.mean(Object.values(row))));
 
@@ -41,33 +49,25 @@ function processAndStoreData(femTemp, maleTemp, femAct, maleAct) {
             avgMalePerDay.push({ day: day + 1, value: dailyMaleAvg });
         }
 
-        formattedData[type] = { female: avgFemalePerDay, male: avgMaleAvgWrapper(avgMalePerDay) };
-        // We use a helper function to ensure male data is stored properly.
-        function avgMaleAvgWrapper(arr) { return arr; }
+        formattedData[type] = { female: avgFemalePerDay, male: avgMalePerDay }; // Assign values
     });
 
-    // Draw initial Temperature view
-    drawLineChart(formattedData.temp.female, formattedData.temp.male, "Temperature (°C)");
+    drawDualAxisChart(
+        formattedData.temp.female, formattedData.act.female,
+        "Female Temperature (°C)", "Female Activity Level", "female"
+    );    
 
-    // Event Listeners
-    document.getElementById("showTemperature").addEventListener("click", function () {
-        currentDataType = "temp"; 
-        drawLineChart(formattedData.temp.female, formattedData.temp.male, "Temperature (°C)");
-    });
-
-    document.getElementById("showActivity").addEventListener("click", function () {
-        currentDataType = "act"; 
-        drawLineChart(formattedData.act.female, formattedData.act.male, "Activity Level");
-    });
-
+    // Attach event listeners to buttons
     document.getElementById("showFemales").addEventListener("click", function () {
-        drawLineChart(formattedData[currentDataType].female, null, currentDataType === "temp" ? "Temperature (°C)" : "Activity Level");
+        d3.select("#visualization-title").text("The Relationship Between Temperature and Activity: Female Mice");
+        drawDualAxisChart(formattedData.temp.female, formattedData.act.female, "Female Temperature (°C)", "Female Activity Level", "female");
     });
-
+    
     document.getElementById("showMales").addEventListener("click", function () {
-        drawLineChart(null, formattedData[currentDataType].male, currentDataType === "temp" ? "Temperature (°C)" : "Activity Level");
+        d3.select("#visualization-title").text("The Relationship Between Temperature and Activity: Male Mice");
+        drawDualAxisChart(formattedData.temp.male, formattedData.act.male, "Male Temperature (°C)", "Male Activity Level", "male");
     });
-
+    
     document.getElementById("playPause").addEventListener("click", function () {
         if (!running) {
             running = true;
@@ -79,6 +79,7 @@ function processAndStoreData(femTemp, maleTemp, femAct, maleAct) {
         }
     });
 
+    // Call bar chart visualization
     drawBarChartRace(femTemp, femAct);
 }
 
@@ -94,137 +95,162 @@ if (d3.select(".tooltip").empty()) {
 }
 const tooltip = d3.select(".tooltip");
 
-// Draw Chart with axes, dots, legends, labels, and tooltips
-function drawLineChart(femaleData, maleData, yLabel) {
-    const width = 800, height = 400, margin = { top: 50, right: 150, bottom: 60, left: 70 };
+function drawDualAxisChart(tempData, actData, tempLabel, actLabel, gender) {
+    d3.select("#chart-container").selectAll(".chart-subtitle").remove(); // Remove existing subtitles before inserting a new one
+    d3.select("#chart").html(""); // Clear previous chart
 
-    d3.select("#chart").html(""); // Clear previous content
+    // Insert a subtitle dynamically
+    d3.select("#chart-container")
+        .insert("h3", ":first-child")
+        .attr("class", "chart-subtitle")
+        .style("text-align", "center")
+        .style("margin-bottom", "10px")
+        .text(gender === "female" ? "Female Mice Data" : "Male Mice Data");
 
-    const svg = d3.select("#chart")
-        .append("svg")
-        .attr("width", width + margin.left + margin.right)
-        .attr("height", height + margin.top + margin.bottom)
-        .append("g")
-        .attr("transform", `translate(${margin.left}, ${margin.top})`);
+    const svg = d3.select("#chart").append("svg")
+        .attr("width", 850)
+        .attr("height", 450);
 
-    // Determine x-domain from available data
-    const xDomain = [1, Math.max(femaleData ? femaleData.length : 0, maleData ? maleData.length : 0)];
+    const margin = { top: 50, right: 50, bottom: 50, left: 50 };
+    const width = 800 - margin.left - margin.right;
+    const height = 400 - margin.top - margin.bottom;
+
     const xScale = d3.scaleLinear()
-        .domain(xDomain)
+        .domain([1, tempData.length])
         .range([0, width]);
 
-    // Determine y-domain from available data arrays (or use defaults if missing)
-    const allData = [];
-    if (femaleData) { allData.push(...femaleData); }
-    if (maleData) { allData.push(...maleData); }
-    const yExtent = d3.extent(allData, d => d.value);
-    const yScale = d3.scaleLinear()
-        .domain([yExtent[0] - 0.5, yExtent[1] + 0.5])
+    const yScaleTemp = d3.scaleLinear()
+        .domain([d3.min(tempData, d => d.value) - 0.5, d3.max(tempData, d => d.value) + 0.5])
         .range([height, 0]);
 
-    const lineGenerator = d3.line()
+    const yScaleAct = d3.scaleLinear()
+        .domain([d3.min(actData, d => d.value) - 5, d3.max(actData, d => d.value) + 5])
+        .range([height, 0]);
+
+    const lineTemp = d3.line()
         .x(d => xScale(d.day))
-        .y(d => yScale(d.value));
+        .y(d => yScaleTemp(d.value));
 
-    // Add X-axis
-    svg.append("g")
-        .attr("transform", `translate(0,${height})`)
-        .call(d3.axisBottom(xScale));
+    const lineAct = d3.line()
+        .x(d => xScale(d.day))
+        .y(d => yScaleAct(d.value));
 
-    // Add Y-axis
-    svg.append("g")
-        .call(d3.axisLeft(yScale));
+    const g = svg.append("g")
+        .attr("transform", `translate(${margin.left}, ${margin.top})`);
 
-    // Add X-axis label
-    svg.append("text")
-        .attr("x", width / 2)
-        .attr("y", height + 40)
-        .attr("text-anchor", "middle")
-        .style("font-size", "14px")
+    const colorScale = {
+        temp: "red",      // Red for temperature (female & male)
+        act: "orange"     // Orange for activity (female & male)
+    };
+
+    const legendData = [
+        { label: "Temperature", color: "red" },
+        { label: "Activity", color: "orange" }
+    ];
+    
+    const legend = svg.selectAll(".legend")
+        .data(legendData)
+        .enter()
+        .append("g")
+        .attr("class", "legend")
+        .attr("transform", (d, i) => `translate(0, ${i * 20})`);
+    
+    legend.append("rect")
+        .attr("x", width - 18)
+        .attr("width", 18)
+        .attr("height", 18)
+        .style("fill", d => d.color);
+    
+    legend.append("text")
+        .attr("x", width - 24)
+        .attr("y", 9)
+        .attr("dy", ".35em")
+        .style("text-anchor", "end")
+        .text(d => d.label);    
+        
+    // Tooltip
+    const tooltip = d3.select(".tooltip");
+
+    function showTooltip(event, d, type) {
+        let valueLabel = type === "temp" ? "Temperature" : "Activity";
+        let unit = type === "temp" ? "°C" : "";
+    
+        tooltip.style("visibility", "visible")
+            .html(`Day: ${d.day}<br>${valueLabel}: ${d.value.toFixed(2)}${unit}`)
+            .style("left", (event.pageX + 10) + "px")
+            .style("top", (event.pageY - 10) + "px");
+    }
+    
+    function hideTooltip() {
+        tooltip.style("visibility", "hidden");
+    }
+
+    // Temperature Line
+    g.append("path")
+        .datum(tempData)
+        .attr("fill", "none")
+        .attr("stroke", "red")
+        .attr("stroke-width", 2)
+        .attr("d", lineTemp);
+
+    // Activity Line
+    g.append("path")
+        .datum(actData)
+        .attr("fill", "none")
+        .attr("stroke", "orange")
+        .attr("stroke-width", 2)
+        .attr("d", lineAct);
+
+    // Data points for Temperature
+    g.selectAll(".temp-dot")
+        .data(tempData)
+        .enter()
+        .append("circle")
+        .attr("class", "temp-dot")
+        .attr("cx", d => xScale(d.day))
+        .attr("cy", d => yScaleTemp(d.value))
+        .attr("r", 5)
+        .attr("fill", "red")
+        .on("mouseover", (event, d) => showTooltip(event, d, "temp"))  // <-- Pass "temp"
+        .on("mouseout", hideTooltip);
+
+    // Data points for Activity
+    g.selectAll(".act-dot")
+        .data(actData)
+        .enter()
+        .append("circle")
+        .attr("class", "act-dot")
+        .attr("cx", d => xScale(d.day))
+        .attr("cy", d => yScaleAct(d.value))
+        .attr("r", 5)
+        .attr("fill", "orange")
+        .on("mouseover", (event, d) => showTooltip(event, d, "act"))  // <-- Pass "act"
+        .on("mouseout", hideTooltip);
+
+    // Axes
+    g.append("g").attr("transform", `translate(0, ${height})`).call(d3.axisBottom(xScale));
+    g.append("g").call(d3.axisLeft(yScaleTemp));
+    g.append("g").attr("transform", `translate(${width}, 0)`).call(d3.axisRight(yScaleAct));
+
+    // Labels
+    g.append("text")
+        .attr("transform", `translate(${width / 2}, ${height + 40})`)
+        .style("text-anchor", "middle")
         .text("Time (Days)");
 
-    // Add Y-axis label
-    svg.append("text")
+    g.append("text")
         .attr("transform", "rotate(-90)")
-        .attr("x", -height / 2)
         .attr("y", -margin.left + 15)
-        .attr("text-anchor", "middle")
-        .style("font-size", "14px")
-        .text(yLabel);
+        .attr("x", -height / 2)
+        .style("text-anchor", "middle")
+        .text(tempLabel);
 
-    // Plot female line and dots if data exists
-    if (femaleData && femaleData.length) {
-        svg.append("path")
-            .datum(femaleData)
-            .attr("fill", "none")
-            .attr("stroke", "red")
-            .attr("stroke-width", 2)
-            .attr("d", lineGenerator);
-
-        svg.selectAll(".dot-female")
-            .data(femaleData)
-            .enter()
-            .append("circle")
-            .attr("class", "dot-female")
-            .attr("cx", d => xScale(d.day))
-            .attr("cy", d => yScale(d.value))
-            .attr("r", 4)
-            .attr("fill", "red")
-            .on("mouseover", function(event, d) {
-                tooltip.style("visibility", "visible")
-                    .text(`Day ${d.day}: ${d.value.toFixed(2)} ${yLabel.includes("°C") ? "°C" : ""}`);
-            })
-            .on("mousemove", function(event) {
-                tooltip.style("top", (event.pageY - 10) + "px")
-                    .style("left", (event.pageX + 10) + "px");
-            })
-            .on("mouseout", function() {
-                tooltip.style("visibility", "hidden");
-            });
-    }
-
-    // Plot male line and dots if data exists
-    if (maleData && maleData.length) {
-        svg.append("path")
-            .datum(maleData)
-            .attr("fill", "none")
-            .attr("stroke", "blue")
-            .attr("stroke-width", 2)
-            .attr("d", lineGenerator);
-
-        svg.selectAll(".dot-male")
-            .data(maleData)
-            .enter()
-            .append("circle")
-            .attr("class", "dot-male")
-            .attr("cx", d => xScale(d.day))
-            .attr("cy", d => yScale(d.value))
-            .attr("r", 4)
-            .attr("fill", "blue")
-            .on("mouseover", function(event, d) {
-                tooltip.style("visibility", "visible")
-                    .text(`Day ${d.day}: ${d.value.toFixed(2)} ${yLabel.includes("°C") ? "°C" : ""}`);
-            })
-            .on("mousemove", function(event) {
-                tooltip.style("top", (event.pageY - 10) + "px")
-                    .style("left", (event.pageX + 10) + "px");
-            })
-            .on("mouseout", function() {
-                tooltip.style("visibility", "hidden");
-            });
-    }
-
-    // Add legend
-    svg.append("text")
-        .attr("x", width + 10)
-        .attr("y", 20)
-        .attr("fill", "red")
-        .text("Female");
-    svg.append("text")
-        .attr("x", width + 10)
-        .attr("y", 40)
-        .attr("fill", "blue")
-        .text("Male");
+    g.append("text")
+        .attr("transform", "rotate(-90)")
+        .attr("y", width + margin.right - 15)
+        .attr("x", -height / 2)
+        .style("text-anchor", "middle")
+        .text(actLabel);
 }
 
 function processBarChartData(femTemp, femAct) {
@@ -295,8 +321,6 @@ function drawBarChartRace(femTemp, femAct) {
 
     let yAxis = d3.axisLeft(yScale).tickFormat(i => `F${Math.floor(i / 2) + 1} ${i % 2 === 0 ? "Temp" : "Act"}`);
 
-    // svg.append("g").attr("transform", `translate(0,${height})`).call(xAxisTemp);
-    // svg.append("g").attr("transform", `translate(${width / 2},${height})`).call(xAxisAct);
     svg.append("g").call(yAxis);
 
     let bars = svg.selectAll(".bar")
