@@ -8,22 +8,20 @@
     <script src="https://d3js.org/d3.v7.min.js"></script>
 </head>
 <body>
-    <script type="module" src="main.js" defer></script>
-
     <h1>The Relationship Between Temperature and Activity: Do Hotter Mice Move More?</h1>
+    <div id="chart-container">
+        <h3 id="gender-subtitle"></h3>
+        <div id="chart"></div>
+    </div>    
+    <div class="tooltip" style="position: absolute; visibility: hidden; background: lightgray; padding: 5px; border-radius: 5px;"></div>
     <div id="controls">
-        <button id="showTemperature">Temperature</button>
-        <button id="showActivity">Activity</button>
-        <button id="showAllMice">Individual Mice</button>
-        <button id="showFemales">Average of Female</button>
-        <button id="showMales">Average of Male</button>
+        <button id="showFemales">Female Mice</button>
+        <button id="showMales">Male Mice</button>
     </div>
-    <div id="chart"></div>
 
     <h2 id="visualization-title" style="text-align: center; margin-bottom: 10px;">
         Temperature and Activity of Female Mice Over Time
     </h2>
-    
     <div id="chart2-container">
         <button id="playPause">Play</button>
         <button id="resetButton">Reset</button>
@@ -37,5 +35,6 @@
         <li>Tommy Li (wal016@ucsd.edu)</li>
       </ul>
 
+      <script type="module" src="main.js" defer></script>
 </body>
 </html>
