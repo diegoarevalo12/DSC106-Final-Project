@@ -1,412 +1,1678 @@
-let currentDataType = "temp"; // Default to temperature
+// Global variables to store data
+let femActData, femTempData, maleActData, maleTempData;
+let selectedGender = 'female';
+let selectedPeriod = '24h';
+let selectedMouse = 'average';
 
-document.addEventListener("DOMContentLoaded", function () {
-    Promise.all([
-        d3.csv("data/Fem_Temp.csv"),
-        d3.csv("data/Male_Temp.csv"),
-        d3.csv("data/Fem_Act.csv"),
-        d3.csv("data/Male_Act.csv")
-    ]).then(function(files) {
-        let femTemperature = files[0];
-        let maleTemperature = files[1];
-        let femActivity = files[2];
-        let maleActivity = files[3];
+// Constants
+const MINUTES_PER_HOUR = 60;
+const HOURS_PER_DAY = 24;
+const MINUTES_PER_DAY = MINUTES_PER_HOUR * HOURS_PER_DAY;
 
-        processAndStoreData(femTemperature, maleTemperature, femActivity, maleActivity);
-    }).catch(function(error) {
-        console.error("Error loading the CSV files:", error);
+// Colors
+const COLORS = {
+    temp: '#ef4444',
+    tempLight: 'rgba(239, 68, 68, 0.1)',
+    act: '#3b82f6',
+    actLight: 'rgba(59, 130, 246, 0.1)',
+    female: '#db2777',
+    male: '#2563eb',
+};
+
+// Load data on page load
+document.addEventListener('DOMContentLoaded', function() {
+    // Set up event listeners for controls (existing code)
+    document.getElementById('gender-select').addEventListener('change', function() {
+        selectedGender = this.value;
+        
+        // Update mouse select options based on gender (call the same function)
+        initializeMouseDropdown();
+        
+        updateVisualizations();
     });
+    
+    document.getElementById('time-period').addEventListener('change', function() {
+        selectedPeriod = this.value;
+        updateVisualizations();
+    });
+    
+    document.getElementById('mouse-select').addEventListener('change', function() {
+        selectedMouse = this.value;
+        updateVisualizations();
+    });
+    
+    // Load data - using numeric parsing for the CSV data
+    Promise.all([
+        d3.csv('data/Fem_Act.csv', d => {
+            const parsed = {};
+            Object.keys(d).forEach(key => {
+                parsed[key] = parseFloat(d[key]);
+            });
+            return parsed;
+        }),
+        d3.csv('data/Fem_Temp.csv', d => {
+            const parsed = {};
+            Object.keys(d).forEach(key => {
+                parsed[key] = parseFloat(d[key]);
+            });
+            return parsed;
+        }),
+        d3.csv('data/Male_Act.csv', d => {
+            const parsed = {};
+            Object.keys(d).forEach(key => {
+                parsed[key] = parseFloat(d[key]);
+            });
+            return parsed;
+        }),
+        d3.csv('data/Male_Temp.csv', d => {
+            const parsed = {};
+            Object.keys(d).forEach(key => {
+                parsed[key] = parseFloat(d[key]);
+            });
+            return parsed;
+        })
+    ]).then(function(files) {
+        femActData = files[0];
+        femTempData = files[1];
+        maleActData = files[2];
+        maleTempData = files[3];
+        
+        console.log("Data loaded successfully");
+        console.log(`Female Activity: ${femActData.length} rows`);
+        console.log(`Female Temperature: ${femTempData.length} rows`);
+        console.log(`Male Activity: ${maleActData.length} rows`);
+        console.log(`Male Temperature: ${maleTempData.length} rows`);
+        
+        // Initialize mouse dropdown based on default gender (female)
+        initializeMouseDropdown();
+        
+        // Initialize visualizations
+        initializeVisualizations();
+    })
 });
 
-let formattedData = { temp: {}, act: {} };
-
-function processAndStoreData(femTemp, maleTemp, femAct, maleAct) {
-    // Default to Female Data First
-    d3.select("#visualization-title").text("The Relationship Between Temperature and Activity: Female Mice");
-
-    // Convert all dataset values to numeric
-    [femTemp, maleTemp, femAct, maleAct].forEach(dataset => {
-        dataset.forEach(d => {
-            Object.keys(d).forEach(k => d[k] = +d[k]); // Convert values to numeric
-        });
-    });
-
-    let numDays = femTemp.length / 1440; // Total days
-
-    ["temp", "act"].forEach((type, index) => {
-        let femData = index === 0 ? femTemp : femAct;
-        let maleData = index === 0 ? maleTemp : maleAct;
-        let avgFemalePerDay = [], avgMalePerDay = [];
-
-        for (let day = 0; day < numDays; day++) {
-            let startIdx = day * 1440, endIdx = (day + 1) * 1440;
-
-            // Calculate mean values per day
-            let dailyFemAvg = d3.mean(femData.slice(startIdx, endIdx).map(row => d3.mean(Object.values(row))));
-            let dailyMaleAvg = d3.mean(maleData.slice(startIdx, endIdx).map(row => d3.mean(Object.values(row))));
-
-            avgFemalePerDay.push({ day: day + 1, value: dailyFemAvg });
-            avgMalePerDay.push({ day: day + 1, value: dailyMaleAvg });
-        }
-
-        formattedData[type] = { female: avgFemalePerDay, male: avgMalePerDay }; // Assign values
-    });
-
-    drawDualAxisChart(
-        formattedData.temp.female, formattedData.act.female,
-        "Female Temperature (°C)", "Female Activity Level", "female"
-    );    
-
-    // Attach event listeners to buttons
-    document.getElementById("showFemales").addEventListener("click", function () {
-        d3.select("#visualization-title").text("The Relationship Between Temperature and Activity: Female Mice");
-        drawDualAxisChart(formattedData.temp.female, formattedData.act.female, "Female Temperature (°C)", "Female Activity Level", "female");
-    });
+// Initialize all visualizations
+function initializeVisualizations() {
+    createTimeSeriesChart();
+    createScatterPlot();
+    createDailyActivityChart();
+    createDailyTempChart();
+    createGenderComparisonChart();
+    createActivityHeatmap();
+    updateSummaryText();
     
-    document.getElementById("showMales").addEventListener("click", function () {
-        d3.select("#visualization-title").text("The Relationship Between Temperature and Activity: Male Mice");
-        drawDualAxisChart(formattedData.temp.male, formattedData.act.male, "Male Temperature (°C)", "Male Activity Level", "male");
-    });
-    
-    document.getElementById("playPause").addEventListener("click", function () {
-        if (!running) {
-            running = true;
-            d3.select(this).text("Pause");
-            playAnimation();
-        } else {
-            running = false;
-            d3.select(this).text("Play");
-        }
-    });
-
-    // Call bar chart visualization
-    drawBarChartRace(femTemp, femAct);
+    // Show success message
+    console.log('All visualizations initialized successfully');
 }
 
-// Ensure tooltip exists only once
-if (d3.select(".tooltip").empty()) {
-    d3.select("body").append("div")
-        .attr("class", "tooltip")
-        .style("position", "absolute")
-        .style("background", "lightgray")
-        .style("padding", "5px")
-        .style("border-radius", "5px")
-        .style("visibility", "hidden");
+// Update all visualizations based on selection
+function updateVisualizations() {
+    // Clear existing visualizations
+    d3.selectAll('.chart-container svg').remove();
+    
+    // Recreate charts with new selections
+    createTimeSeriesChart();
+    createScatterPlot();
+    createDailyActivityChart();
+    createDailyTempChart();
+    createGenderComparisonChart();
+    createActivityHeatmap();
+    updateSummaryText();
+    
+    // Log update
+    console.log(`Updated visualizations: Gender=${selectedGender}, Period=${selectedPeriod}, Mouse=${selectedMouse}`);
 }
-const tooltip = d3.select(".tooltip");
 
-function drawDualAxisChart(tempData, actData, tempLabel, actLabel, gender) {
-    d3.select("#chart-container").selectAll(".chart-subtitle").remove(); // Remove existing subtitles before inserting a new one
-    d3.select("#chart").html(""); // Clear previous chart
-
-    // Insert a subtitle dynamically
-    d3.select("#chart-container")
-        .insert("h3", ":first-child")
-        .attr("class", "chart-subtitle")
-        .style("text-align", "center")
-        .style("margin-bottom", "10px")
-        .text(gender === "female" ? "Female Mice Data" : "Male Mice Data");
-
-    const svg = d3.select("#chart").append("svg")
-        .attr("width", 850)
-        .attr("height", 450);
-
-    const margin = { top: 50, right: 50, bottom: 50, left: 50 };
-    const width = 800 - margin.left - margin.right;
-    const height = 400 - margin.top - margin.bottom;
-
-    const xScale = d3.scaleLinear()
-        .domain([1, tempData.length])
-        .range([0, width]);
-
-    const yScaleTemp = d3.scaleLinear()
-        .domain([d3.min(tempData, d => d.value) - 0.5, d3.max(tempData, d => d.value) + 0.5])
-        .range([height, 0]);
-
-    const yScaleAct = d3.scaleLinear()
-        .domain([d3.min(actData, d => d.value) - 5, d3.max(actData, d => d.value) + 5])
-        .range([height, 0]);
-
-    const lineTemp = d3.line()
-        .x(d => xScale(d.day))
-        .y(d => yScaleTemp(d.value));
-
-    const lineAct = d3.line()
-        .x(d => xScale(d.day))
-        .y(d => yScaleAct(d.value));
-
-    const g = svg.append("g")
-        .attr("transform", `translate(${margin.left}, ${margin.top})`);
-
-    const colorScale = {
-        temp: "red",      // Red for temperature (female & male)
-        act: "orange"     // Orange for activity (female & male)
-    };
-
-    const legendData = [
-        { label: "Temperature", color: "red" },
-        { label: "Activity", color: "orange" }
-    ];
+// Process data based on current selection
+function getFilteredData() {
+    let actData = [];
+    let tempData = [];
     
-    const legend = svg.selectAll(".legend")
-        .data(legendData)
-        .enter()
-        .append("g")
-        .attr("class", "legend")
-        .attr("transform", (d, i) => `translate(0, ${i * 20})`);
+    // Filter by gender
+    if (selectedGender === 'female') {
+        actData = actData.concat(femActData);
+        tempData = tempData.concat(femTempData);
+    } else {
+        actData = actData.concat(maleActData);
+        tempData = tempData.concat(maleTempData);
+    }
     
-    legend.append("rect")
-        .attr("x", width - 18)
-        .attr("width", 18)
-        .attr("height", 18)
-        .style("fill", d => d.color);
+    // Filter by time period
+    let periodInMinutes;
+    switch (selectedPeriod) {
+        case '24h':
+            periodInMinutes = MINUTES_PER_DAY;
+            break;
+        case '7d':
+            periodInMinutes = MINUTES_PER_DAY * 7;
+            break;
+        case '14d':
+            periodInMinutes = MINUTES_PER_DAY * 14;
+            break;
+        default:
+            periodInMinutes = MINUTES_PER_DAY;
+    }
     
-    legend.append("text")
-        .attr("x", width - 24)
-        .attr("y", 9)
-        .attr("dy", ".35em")
-        .style("text-anchor", "end")
-        .text(d => d.label);    
+    actData = actData.slice(0, periodInMinutes);
+    tempData = tempData.slice(0, periodInMinutes);
+    
+    return { actData, tempData };
+}
+
+// Get list of mouse IDs based on gender selection
+function getMouseIds() {
+    const femaleIds = ['f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'f10', 'f11', 'f12', 'f13'];
+    const maleIds = ['m1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7', 'm8', 'm9', 'm10', 'm11', 'm12', 'm13'];
+    
+    if (selectedGender === 'female') {
+        return femaleIds;
+    } else {
+        return maleIds;
+    }
+}
+
+// Calculate hourly averages for a dataset
+function calculateHourlyAverages(data, mouseIds) {
+    const hoursInPeriod = Math.floor(data.length / MINUTES_PER_HOUR);
+    const hourlyData = [];
+    
+    for (let hour = 0; hour < hoursInPeriod; hour++) {
+        const startIdx = hour * MINUTES_PER_HOUR;
+        const endIdx = startIdx + MINUTES_PER_HOUR;
+        const hourSlice = data.slice(startIdx, endIdx);
         
-    // Tooltip
-    const tooltip = d3.select(".tooltip");
-
-    function showTooltip(event, d, type) {
-        let valueLabel = type === "temp" ? "Temperature" : "Activity";
-        let unit = type === "temp" ? "°C" : "";
-    
-        tooltip.style("visibility", "visible")
-            .html(`Day: ${d.day}<br>${valueLabel}: ${d.value.toFixed(2)}${unit}`)
-            .style("left", (event.pageX + 10) + "px")
-            .style("top", (event.pageY - 10) + "px");
-    }
-    
-    function hideTooltip() {
-        tooltip.style("visibility", "hidden");
-    }
-
-    // Temperature Line
-    g.append("path")
-        .datum(tempData)
-        .attr("fill", "none")
-        .attr("stroke", "red")
-        .attr("stroke-width", 2)
-        .attr("d", lineTemp);
-
-    // Activity Line
-    g.append("path")
-        .datum(actData)
-        .attr("fill", "none")
-        .attr("stroke", "orange")
-        .attr("stroke-width", 2)
-        .attr("d", lineAct);
-
-    // Data points for Temperature
-    g.selectAll(".temp-dot")
-        .data(tempData)
-        .enter()
-        .append("circle")
-        .attr("class", "temp-dot")
-        .attr("cx", d => xScale(d.day))
-        .attr("cy", d => yScaleTemp(d.value))
-        .attr("r", 5)
-        .attr("fill", "red")
-        .on("mouseover", (event, d) => showTooltip(event, d, "temp"))  // <-- Pass "temp"
-        .on("mouseout", hideTooltip);
-
-    // Data points for Activity
-    g.selectAll(".act-dot")
-        .data(actData)
-        .enter()
-        .append("circle")
-        .attr("class", "act-dot")
-        .attr("cx", d => xScale(d.day))
-        .attr("cy", d => yScaleAct(d.value))
-        .attr("r", 5)
-        .attr("fill", "orange")
-        .on("mouseover", (event, d) => showTooltip(event, d, "act"))  // <-- Pass "act"
-        .on("mouseout", hideTooltip);
-
-    // Axes
-    g.append("g").attr("transform", `translate(0, ${height})`).call(d3.axisBottom(xScale));
-    g.append("g").call(d3.axisLeft(yScaleTemp));
-    g.append("g").attr("transform", `translate(${width}, 0)`).call(d3.axisRight(yScaleAct));
-
-    // Labels
-    g.append("text")
-        .attr("transform", `translate(${width / 2}, ${height + 40})`)
-        .style("text-anchor", "middle")
-        .text("Time (Days)");
-
-    g.append("text")
-        .attr("transform", "rotate(-90)")
-        .attr("y", -margin.left + 15)
-        .attr("x", -height / 2)
-        .style("text-anchor", "middle")
-        .text(tempLabel);
-
-    g.append("text")
-        .attr("transform", "rotate(-90)")
-        .attr("y", width + margin.right - 15)
-        .attr("x", -height / 2)
-        .style("text-anchor", "middle")
-        .text(actLabel);
-}
-
-function processBarChartData(femTemp, femAct) {
-    console.log("Raw Temperature Data:", femTemp); 
-    console.log("Raw Activity Data:", femAct); 
-
-    let hourlyData = [];
-    let numHours = femTemp.length / 60; // Convert minute data to hours
-
-    for (let hour = 0; hour < numHours; hour++) {
-        let startIdx = hour * 60, endIdx = (hour + 1) * 60;
-        let dayNumber = Math.floor(hour / 24) + 1; // Calculate the day
-        let hourOfDay = hour % 24; // Hour within the day
-
-        let hourlyAvg = { day: dayNumber, hour: hourOfDay }; // Store Day and Hour Info
-
-        // Calculate mean for each female mouse (Temperature & Activity)
-        Object.keys(femTemp[0]).forEach(mouse => {
-            if (mouse !== "day" && mouse !== "hour") { 
-                hourlyAvg[`${mouse}_temp`] = d3.mean(femTemp.slice(startIdx, endIdx).map(row => row[mouse]));
-                hourlyAvg[`${mouse}_act`] = d3.mean(femAct.slice(startIdx, endIdx).map(row => row[mouse]));
+        // Calculate average for each mouse for this hour
+        const hourAvg = { hour: hour % HOURS_PER_DAY };
+        let sum = 0;
+        let count = 0;
+        
+        mouseIds.forEach(id => {
+            const values = hourSlice.map(row => parseFloat(row[id])).filter(val => !isNaN(val));
+            if (values.length > 0) {
+                const avg = values.reduce((a, b) => a + b, 0) / values.length;
+                hourAvg[id] = avg;
+                sum += avg;
+                count++;
             }
         });
-
-        console.log(`Day ${dayNumber}, Hour ${hourOfDay}:`, hourlyAvg); // Debugging
-        hourlyData.push(hourlyAvg);
+        
+        // Calculate overall average for all selected mice
+        hourAvg.average = count > 0 ? sum / count : 0;
+        hourlyData.push(hourAvg);
     }
+    
     return hourlyData;
 }
 
-function drawBarChartRace(femTemp, femAct) {
-    const width = 800, height = 700, margin = { top: 50, right: 50, bottom: 50, left: 150 };
-    const barHeight = 20;
-    const numMice = 13;
-    const duration = 1000;
-
-    let hourlyData = processBarChartData(femTemp, femAct);
-    let minTemp = 35, maxTemp = 40;
-    let maxActivity = d3.max(hourlyData, d => d3.max(Object.values(d).filter(v => typeof v === 'number')));
-
-    let svg = d3.select("#chart2")
-        .append("svg")
-        .attr("width", width + margin.left + margin.right)
-        .attr("height", height + margin.top + margin.bottom)
-        .append("g")
-        .attr("transform", `translate(${margin.left}, ${margin.top})`);
-
-    // X Scales for Temperature and Activity
-    let xScaleTemp = d3.scaleLinear().domain([minTemp, maxTemp]).range([0, width / 2]);
-
-    // Find the max activity value dynamically across all hours
-    let maxActivityValue = d3.max(hourlyData, d =>
-        d3.max(Object.keys(d).filter(k => k.includes("_act")).map(k => d[k]))
-    );
-
-    // Adjust xScaleAct to ensure correct proportions
-    let xScaleAct = d3.scaleLinear()
-        .domain([0, maxActivityValue])  // Scale based on the highest activity value
-        .range([0, width - margin.right]);  // Keep it proportional to the width
-
-    let yScale = d3.scaleBand()
-        .domain(d3.range(numMice * 2)) // Multiply by 2 for Temp + Activity
-        .range([0, numMice * 2 * barHeight])
-        .padding(0.1);
-
-    let xAxisTemp = d3.axisBottom(xScaleTemp).tickValues(d3.range(minTemp, maxTemp + 0.5, 0.5)).tickFormat(d => `${d.toFixed(1)}°C`);
-    let xAxisAct = d3.axisBottom(xScaleAct).ticks(5);
-
-    let yAxis = d3.axisLeft(yScale).tickFormat(i => `F${Math.floor(i / 2) + 1} ${i % 2 === 0 ? "Temp" : "Act"}`);
-
-    svg.append("g").call(yAxis);
-
-    let bars = svg.selectAll(".bar")
-        .data(Object.keys(hourlyData[0]).filter(d => d.includes("_temp") || d.includes("_act")))
-        .enter()
-        .append("rect")
-        .attr("class", "bar")
-        .attr("y", (d, i) => yScale(i))
-        .attr("height", yScale.bandwidth())
-        .attr("fill", d => d.includes("_temp") ? "#FD2C4C" : "#FFA500");
-
-    let labels = svg.selectAll(".label")
-        .data(Object.keys(hourlyData[0]).filter(d => d.includes("_temp") || d.includes("_act")))
-        .enter()
-        .append("text")
-        .attr("class", "label")
-        .attr("y", (d, i) => yScale(i) + yScale.bandwidth() / 2)
-        .attr("dy", ".35em")
-        .attr("text-anchor", "start");
-
-    let hourText = svg.append("text")
-        .attr("x", width - 180)
-        .attr("y", -20)
-        .attr("class", "hour-text")
-        .style("font-size", "18px")
-        .text("Day: 1, Hour: 0");
-
-    let running = false;
-    let currentHour = 0;
-    let interval;
-
-    function update(hour) {
-        let data = hourlyData[hour];
-
-        bars.transition().duration(duration)
-            .attr("width", d => d.includes("_temp") ? xScaleTemp(data[d]) : xScaleAct(data[d]));
-
-        labels.transition().duration(duration)
-            .attr("x", d => {
-                if (d.includes("_temp")) {
-                    return xScaleTemp(data[d]) + 5; // Position slightly right of temperature bars
-                } else {
-                    return xScaleAct(data[d]) + 5; // Push activity labels further to the right
+// Create time series chart showing temperature and activity over time
+function createTimeSeriesChart() {
+    const { actData, tempData } = getFilteredData();
+    const mouseIds = getMouseIds();
+    
+    // Container dimensions
+    const container = document.getElementById('time-series-chart');
+    const width = container.clientWidth;
+    const height = container.clientHeight || 400;
+    const margin = { top: 30, right: 50, bottom: 60, left: 60 };
+    const chartWidth = width - margin.left - margin.right;
+    const chartHeight = height - margin.top - margin.bottom;
+    
+    // Create SVG
+    const svg = d3.select('#time-series-chart')
+        .append('svg')
+        .attr('width', width)
+        .attr('height', height);
+    
+    // Create chart group
+    const chart = svg.append('g')
+        .attr('transform', `translate(${margin.left}, ${margin.top})`);
+    
+    // Prepare data for visualization
+    const combinedData = [];
+    
+    // If average is selected, calculate averages across all mice
+    if (selectedMouse === 'average') {
+        for (let i = 0; i < Math.min(actData.length, tempData.length); i++) {
+            const actRow = actData[i];
+            const tempRow = tempData[i];
+            
+            // Calculate average activity and temperature across all applicable mice
+            let sumAct = 0, sumTemp = 0, countAct = 0, countTemp = 0;
+            
+            mouseIds.forEach(id => {
+                if (!isNaN(actRow[id])) {
+                    sumAct += actRow[id];
+                    countAct++;
                 }
-            })
-            .attr("y", (d, i) => yScale(i) + yScale.bandwidth() / 2 + 4) // Adjust vertical alignment
-            .text(d => `${data[d].toFixed(2)}${d.includes("_temp") ? "°C" : ""}`);
-        
-
-        let currentDay = data.day;
-        let currentHour = data.hour;
-        hourText.text(`Day: ${currentDay}, Hour: ${currentHour + 1}`);
-    }
-
-    function playAnimation() {
-        if (running) clearInterval(interval);
-        running = true;
-        interval = setInterval(() => {
-            if (currentHour >= hourlyData.length - 1) currentHour = 0;
-            else currentHour++;
-            update(currentHour);
-        }, duration);
+                if (!isNaN(tempRow[id])) {
+                    sumTemp += tempRow[id];
+                    countTemp++;
+                }
+            });
+            
+            const avgAct = countAct > 0 ? sumAct / countAct : 0;
+            const avgTemp = countTemp > 0 ? sumTemp / countTemp : 0;
+            
+            combinedData.push({
+                minute: i,
+                activity: avgAct,
+                temperature: avgTemp
+            });
+        }
+    } else {
+        // Use data for specific mouse
+        for (let i = 0; i < Math.min(actData.length, tempData.length); i++) {
+            const actRow = actData[i];
+            const tempRow = tempData[i];
+            
+            combinedData.push({
+                minute: i,
+                activity: actRow[selectedMouse] || 0,
+                temperature: tempRow[selectedMouse] || 0
+            });
+        }
     }
     
-    // Add this immediately after `playAnimation()`
-    d3.select("#resetButton").on("click", function () {
-        clearInterval(interval); // Stop the animation if running
-        running = false; // Mark animation as stopped
-        currentHour = 0; // Reset to first hour
-        update(currentHour); // Update chart to first hour
-        d3.select("#playPause").text("Play"); // Reset Play button text
-    });
-
-    d3.select("#playPause").on("click", function () {
-        if (running) {
-            clearInterval(interval);
-            running = false;
-            d3.select(this).text("Play");
-        } else {
-            playAnimation();
-            d3.select(this).text("Pause");
-        }
-    });
-
-    update(0);
+    // Create scales
+    const xScale = d3.scaleLinear()
+        .domain([0, combinedData.length - 1])
+        .range([0, chartWidth]);
+    
+    const yScaleTemp = d3.scaleLinear()
+        .domain([
+            d3.min(combinedData, d => d.temperature) * 0.99,
+            d3.max(combinedData, d => d.temperature) * 1.01
+        ])
+        .range([chartHeight, 0]);
+    
+    const yScaleAct = d3.scaleLinear()
+        .domain([0, d3.max(combinedData, d => d.activity) * 1.05])
+        .range([chartHeight, 0]);
+    
+    // Create lines
+    const tempLine = d3.line()
+        .x(d => xScale(d.minute))
+        .y(d => yScaleTemp(d.temperature))
+        .curve(d3.curveMonotoneX);
+    
+    const actLine = d3.line()
+        .x(d => xScale(d.minute))
+        .y(d => yScaleAct(d.activity))
+        .curve(d3.curveMonotoneX);
+    
+    // Add areas
+    chart.append('path')
+        .datum(combinedData)
+        .attr('class', 'area-temp')
+        .attr('d', d3.area()
+            .x(d => xScale(d.minute))
+            .y0(chartHeight)
+            .y1(d => yScaleTemp(d.temperature))
+            .curve(d3.curveMonotoneX)
+        );
+    
+    chart.append('path')
+        .datum(combinedData)
+        .attr('class', 'area-act')
+        .attr('d', d3.area()
+            .x(d => xScale(d.minute))
+            .y0(chartHeight)
+            .y1(d => yScaleAct(d.activity))
+            .curve(d3.curveMonotoneX)
+        );
+    
+    // Add lines
+    chart.append('path')
+        .datum(combinedData)
+        .attr('class', 'line-temp')
+        .attr('d', tempLine);
+    
+    chart.append('path')
+        .datum(combinedData)
+        .attr('class', 'line-act')
+        .attr('d', actLine);
+    
+    // Create axes
+    const xAxis = d3.axisBottom(xScale)
+        .ticks(10)
+        .tickFormat(d => {
+            const hours = Math.floor(d / 60) % 24;
+            const days = Math.floor(d / 1440) + 1;
+            return selectedPeriod === '24h' ? `${hours}h` : `Day ${days}`;
+        });
+    
+    const yAxisTemp = d3.axisLeft(yScaleTemp)
+        .ticks(5);
+    
+    const yAxisAct = d3.axisRight(yScaleAct)
+        .ticks(5);
+    
+    // Add axes to chart
+    chart.append('g')
+        .attr('class', 'x-axis')
+        .attr('transform', `translate(0, ${chartHeight})`)
+        .call(xAxis)
+        .selectAll('text')
+        .style('text-anchor', 'end')
+        .attr('dx', '-.8em')
+        .attr('dy', '.15em')
+        .attr('transform', 'rotate(-45)');
+    
+    chart.append('g')
+        .attr('class', 'y-axis-temp')
+        .call(yAxisTemp);
+    
+    chart.append('g')
+        .attr('class', 'y-axis-act')
+        .attr('transform', `translate(${chartWidth}, 0)`)
+        .call(yAxisAct);
+    
+    // Add axis labels
+    chart.append('text')
+        .attr('class', 'x-axis-label')
+        .attr('x', chartWidth / 2)
+        .attr('y', chartHeight + margin.bottom - 10)
+        .style('text-anchor', 'middle')
+        .text('Time');
+    
+    chart.append('text')
+        .attr('class', 'y-axis-label-temp')
+        .attr('transform', 'rotate(-90)')
+        .attr('x', -chartHeight / 2)
+        .attr('y', -margin.left + 15)
+        .style('text-anchor', 'middle')
+        .style('fill', COLORS.temp)
+        .text('Temperature (°C)');
+    
+    chart.append('text')
+        .attr('class', 'y-axis-label-act')
+        .attr('transform', 'rotate(90)')
+        .attr('x', chartHeight / 2)
+        .attr('y', -chartWidth - margin.right + 15)
+        .style('text-anchor', 'middle')
+        .style('fill', COLORS.act)
+        .text('Activity Level');
+    
+    // Add legend
+    const legend = svg.append('g')
+        .attr('class', 'legend')
+        .attr('transform', `translate(${margin.left}, 10)`);
+    
+    legend.append('rect')
+        .attr('x', 0)
+        .attr('y', 0)
+        .attr('width', 15)
+        .attr('height', 15)
+        .attr('fill', COLORS.temp);
+    
+    legend.append('text')
+        .attr('x', 20)
+        .attr('y', 12)
+        .text('Temperature');
+    
+    legend.append('rect')
+        .attr('x', 120)
+        .attr('y', 0)
+        .attr('width', 15)
+        .attr('height', 15)
+        .attr('fill', COLORS.act);
+    
+    legend.append('text')
+        .attr('x', 140)
+        .attr('y', 12)
+        .text('Activity');
+    
+    // Add title
+    const mouseLabel = selectedMouse === 'average' ? 'Average' : selectedMouse;
+    const genderLabel = selectedGender === 'all' ? 'All Mice' : 
+                       (selectedGender === 'female' ? 'Female Mice' : 'Male Mice');
+    
+    svg.append('text')
+        .attr('class', 'chart-title')
+        .attr('x', width / 2)
+        .attr('y', 15)
+        .attr('text-anchor', 'middle')
+        .style('font-weight', 'bold')
+        .text(`${mouseLabel} - ${genderLabel}`);
 }
 
-// Call the function with the processed temperature data
-drawBarChartRace(femTemp, femAct);
+// Create scatter plot to show correlation between temperature and activity
+// Create scatter plot to show correlation between temperature and activity
+function createScatterPlot() {
+    const { actData, tempData } = getFilteredData();
+    const mouseIds = getMouseIds();
+    
+    // Container dimensions
+    const container = document.getElementById('scatter-plot');
+    const width = container.clientWidth;
+    const height = container.clientHeight || 400;
+    const margin = { top: 30, right: 30, bottom: 60, left: 60 };
+    const chartWidth = width - margin.left - margin.right;
+    const chartHeight = height - margin.top - margin.bottom;
+    
+    // Create SVG
+    const svg = d3.select('#scatter-plot')
+        .append('svg')
+        .attr('width', width)
+        .attr('height', height);
+    
+    // Create chart group
+    const chart = svg.append('g')
+        .attr('transform', `translate(${margin.left}, ${margin.top})`);
+    
+    // Create tooltip div (if it doesn't exist)
+    let tooltip = d3.select('body').select('.tooltip');
+    if (tooltip.empty()) {
+        tooltip = d3.select('body')
+            .append('div')
+            .attr('class', 'tooltip')
+            .style('opacity', 0)
+            .style('position', 'absolute')
+            .style('background-color', 'rgba(0, 0, 0, 0.8)')
+            .style('color', 'white')
+            .style('border-radius', '4px')
+            .style('padding', '10px')
+            .style('font-size', '12px')
+            .style('pointer-events', 'none')
+            .style('z-index', 1000);
+    }
+    
+    // Prepare data for scatter plot (no animation)
+    const scatterData = [];
+    
+    // Sample data to prevent too many points
+    const sampleRate = Math.max(1, Math.floor(actData.length / 300));
+    
+    // If a specific mouse is selected, we'll only show data for that mouse
+    const isMouseSelected = selectedMouse !== 'average';
+    
+    for (let i = 0; i < actData.length; i += sampleRate) {
+        // If a specific mouse is selected, only process that mouse's data
+        const mousesToProcess = isMouseSelected ? [selectedMouse] : mouseIds;
+        
+        mousesToProcess.forEach(id => {
+            const act = actData[i] ? actData[i][id] : null;
+            const temp = tempData[i] ? tempData[i][id] : null;
+            
+            if (act !== null && temp !== null && !isNaN(act) && !isNaN(temp)) {
+                // Add time information to data points
+                const minute = i;
+                const hour = Math.floor(minute / 60) % 24;
+                const day = Math.floor(minute / (24 * 60)) + 1;
+                
+                scatterData.push({
+                    mouseId: id,
+                    activity: act,
+                    temperature: temp,
+                    minute: minute,
+                    hour: hour,
+                    day: day,
+                    timeString: `Day ${day}, ${hour}:${(minute % 60).toString().padStart(2, '0')}`
+                });
+            }
+        });
+    }
+    
+    console.log("Scatter data points:", scatterData.length);
+    console.log("Female points:", scatterData.filter(d => d.mouseId.startsWith('f')).length);
+    console.log("Male points:", scatterData.filter(d => d.mouseId.startsWith('m')).length);
+    
+    // Create scales
+    const xScale = d3.scaleLinear()
+        .domain([
+            d3.min(scatterData, d => d.temperature) * 0.99,
+            d3.max(scatterData, d => d.temperature) * 1.01
+        ])
+        .range([0, chartWidth]);
+    
+    const yScale = d3.scaleLinear()
+        .domain([0, d3.max(scatterData, d => d.activity) * 1.05])
+        .range([chartHeight, 0]);
+    
+    // Create color scale based on mouse ID
+    const colorScale = d => {
+        // If a specific mouse is selected
+        if (selectedMouse !== 'average') {
+            // Highlight the selected mouse with full color
+            if (d.mouseId === selectedMouse) {
+                return d.mouseId.startsWith('f') ? COLORS.female : COLORS.male;
+            }
+            // For other mice, return a very light gray
+            return '#e5e7eb';
+        } else {
+            // Regular coloring by gender for the "average" view
+            return d.mouseId.startsWith('f') ? COLORS.female : COLORS.male;
+        }
+    };
+    
+    // Add dots
+    chart.selectAll('.dot')
+        .data(scatterData)
+        .enter()
+        .append('circle')
+        .attr('class', 'dot')
+        .attr('cx', d => xScale(d.temperature))
+        .attr('cy', d => yScale(d.activity))
+        .attr('r', d => d.mouseId === selectedMouse ? 4 : 3) // Slightly larger for selected mouse
+        .attr('fill', d => colorScale(d))
+        .attr('opacity', d => {
+            if (selectedMouse !== 'average') {
+                // Higher opacity for selected mouse, lower for others
+                return d.mouseId === selectedMouse ? 0.8 : 0.3;
+            }
+            return 0.6; // Default opacity
+        })
+        .attr('stroke', d => colorScale(d))
+        .attr('stroke-width', d => d.mouseId === selectedMouse ? 1.5 : 1) // Thicker stroke for selected mouse
+        // Add tooltip event handlers
+        .on('mouseover', function(event, d) {
+            // Enlarge the dot on hover
+            d3.select(this)
+                .transition()
+                .duration(100)
+                .attr('r', 6)
+                .attr('opacity', 1);
+            
+            // Show tooltip
+            tooltip.transition()
+                .duration(100)
+                .style('opacity', 0.9);
+            
+            // Format the tooltip content
+            tooltip.html(`
+                <strong>${d.mouseId.startsWith('f') ? 'Female ' : 'Male '}${d.mouseId.substring(1)}</strong><br>
+                <strong>Time:</strong> ${d.timeString}<br>
+                <strong>Temp:</strong> ${d.temperature.toFixed(2)}°C<br>
+                <strong>Activity:</strong> ${d.activity.toFixed(2)}
+            `)
+                .style('left', (event.pageX + 10) + 'px')
+                .style('top', (event.pageY - 15) + 'px');
+        })
+        .on('mouseout', function() {
+            // Return dot to original size
+            d3.select(this)
+                .transition()
+                .duration(100)
+                .attr('r', 3)
+                .attr('opacity', 0.6);
+            
+            // Hide tooltip
+            tooltip.transition()
+                .duration(100)
+                .style('opacity', 0);
+        });
+    
+    // Add regression line if enough data points
+    if (scatterData.length >= 10) {
+        // Calculate simple linear regression
+        const xMean = d3.mean(scatterData, d => d.temperature);
+        const yMean = d3.mean(scatterData, d => d.activity);
+        
+        let numerator = 0;
+        let denominator = 0;
+        
+        scatterData.forEach(d => {
+            const xDiff = d.temperature - xMean;
+            const yDiff = d.activity - yMean;
+            numerator += xDiff * yDiff;
+            denominator += xDiff * xDiff;
+        });
+        
+        const slope = denominator !== 0 ? numerator / denominator : 0;
+        const intercept = yMean - slope * xMean;
+        
+        // Calculate correlation coefficient
+        let sumXY = 0, sumX = 0, sumY = 0, sumX2 = 0, sumY2 = 0;
+        
+        scatterData.forEach(d => {
+            sumXY += d.temperature * d.activity;
+            sumX += d.temperature;
+            sumY += d.activity;
+            sumX2 += d.temperature * d.temperature;
+            sumY2 += d.activity * d.activity;
+        });
+        
+        const n = scatterData.length;
+        const numeratorR = n * sumXY - sumX * sumY;
+        const denominatorR = Math.sqrt((n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY));
+        const r = denominatorR !== 0 ? numeratorR / denominatorR : 0;
+        
+        // Create a line function using the regression parameters
+        const regressionLine = d3.line()
+            .x(d => d)
+            .y(d => slope * d + intercept);
+        
+        // Draw the regression line
+        const xDomain = xScale.domain();
+        chart.append('path')
+            .datum([xDomain[0], xDomain[1]])
+            .attr('class', 'regression-line')
+            .attr('d', regressionLine.x(d => xScale(d)))
+            .attr('stroke', '#222')
+            .attr('stroke-width', 2)
+            .attr('stroke-dasharray', '5,5')
+            .attr('fill', 'none');
+        
+        // Add correlation text
+        chart.append('text')
+            .attr('x', chartWidth - 10)
+            .attr('y', 20)
+            .attr('text-anchor', 'end')
+            .style('font-size', '12px')
+            .text(`Correlation (r): ${r.toFixed(3)}`);
+    }
+    
+    // Create axes
+    const xAxis = d3.axisBottom(xScale)
+        .ticks(5)
+        .tickFormat(d => `${d.toFixed(1)}°C`);
+    
+    const yAxis = d3.axisLeft(yScale)
+        .ticks(5);
+    
+    // Add axes to chart
+    chart.append('g')
+        .attr('class', 'x-axis')
+        .attr('transform', `translate(0, ${chartHeight})`)
+        .call(xAxis);
+    
+    chart.append('g')
+        .attr('class', 'y-axis')
+        .call(yAxis);
+    
+    // Add axis labels
+    chart.append('text')
+        .attr('class', 'x-axis-label')
+        .attr('x', chartWidth / 2)
+        .attr('y', chartHeight + margin.bottom - 10)
+        .style('text-anchor', 'middle')
+        .text('Temperature (°C)');
+    
+    chart.append('text')
+        .attr('class', 'y-axis-label')
+        .attr('transform', 'rotate(-90)')
+        .attr('x', -chartHeight / 2)
+        .attr('y', -margin.left + 15)
+        .style('text-anchor', 'middle')
+        .text('Activity Level');
+    
+    // Add legend if showing all mice
+    if (selectedMouse === 'average') {
+        const legend = svg.append('g')
+            .attr('class', 'legend')
+            .attr('transform', `translate(${margin.left}, 10)`);
+        
+        if (selectedGender === 'all') {
+            legend.append('circle')
+                .attr('cx', 7.5)
+                .attr('cy', 7.5)
+                .attr('r', 5)
+                .attr('fill', COLORS.female);
+            
+            legend.append('text')
+                .attr('x', 20)
+                .attr('y', 12)
+                .text('Female');
+            
+            legend.append('circle')
+                .attr('cx', 87.5)
+                .attr('cy', 7.5)
+                .attr('r', 5)
+                .attr('fill', COLORS.male);
+            
+            legend.append('text')
+                .attr('x', 100)
+                .attr('y', 12)
+                .text('Male');
+        }
+    }
+    
+    // Add title
+    const mouseLabel = selectedMouse === 'average' ? 'All Mice' : selectedMouse;
+    const genderLabel = selectedGender === 'all' ? '' : 
+                       (selectedGender === 'female' ? '(Females)' : '(Males)');
+    
+    svg.append('text')
+        .attr('class', 'chart-title')
+        .attr('x', width / 2)
+        .attr('y', 15)
+        .attr('text-anchor', 'middle')
+        .style('font-weight', 'bold')
+        .text(`Temperature vs Activity: ${mouseLabel} ${genderLabel}`);
+}
+
+// Create a 24-hour activity pattern chart
+function createDailyActivityChart() {
+    const { actData } = getFilteredData();
+    const mouseIds = getMouseIds();
+    
+    // Container dimensions
+    const container = document.getElementById('daily-activity-chart');
+    const width = container.clientWidth;
+    const height = container.clientHeight || 400;
+    const margin = { top: 30, right: 30, bottom: 60, left: 60 };
+    const chartWidth = width - margin.left - margin.right;
+    const chartHeight = height - margin.top - margin.bottom;
+    
+    // Create SVG
+    const svg = d3.select('#daily-activity-chart')
+        .append('svg')
+        .attr('width', width)
+        .attr('height', height);
+    
+    // Create chart group
+    const chart = svg.append('g')
+        .attr('transform', `translate(${margin.left}, ${margin.top})`);
+    
+    // Calculate hourly averages
+    const hourlyData = calculateHourlyAverages(actData, mouseIds);
+    
+    // Use a different array for days in the dataset
+    const dayCount = Math.floor(actData.length / (24 * 60));
+    const daysData = [];
+    
+    // For each day in the dataset
+    for (let day = 0; day < dayCount; day++) {
+        // Get data for this day
+        const start = day * 24;
+        const end = start + 24;
+        const dayHours = hourlyData.slice(start, end);
+        
+        // Skip if we don't have 24 hours
+        if (dayHours.length < 24) continue;
+        
+        // Plot this day's data
+        const dayData = dayHours.map((hour, i) => ({
+            hour: i,
+            activity: selectedMouse === 'average' ? hour.average : hour[selectedMouse] || 0
+        }));
+        
+        daysData.push(dayData);
+    }
+    
+    // Calculate the average across all days for each hour
+    const avgDailyData = Array(24).fill().map((_, hour) => {
+        const hourValues = daysData.map(day => day[hour].activity).filter(v => !isNaN(v));
+        return {
+            hour,
+            activity: hourValues.length > 0 ? d3.mean(hourValues) : 0
+        };
+    });
+    
+    // Create scales
+    const xScale = d3.scaleLinear()
+        .domain([0, 23])
+        .range([0, chartWidth]);
+    
+    const yScale = d3.scaleLinear()
+        .domain([0, d3.max(avgDailyData, d => d.activity) * 1.1])
+        .range([chartHeight, 0]);
+    
+    // Create line
+    const activityLine = d3.line()
+        .x(d => xScale(d.hour))
+        .y(d => yScale(d.activity))
+        .curve(d3.curveMonotoneX);
+    
+    // Add area
+    chart.append('path')
+        .datum(avgDailyData)
+        .attr('class', 'area-act')
+        .attr('d', d3.area()
+            .x(d => xScale(d.hour))
+            .y0(chartHeight)
+            .y1(d => yScale(d.activity))
+            .curve(d3.curveMonotoneX)
+        );
+    
+    // Add line
+    chart.append('path')
+        .datum(avgDailyData)
+        .attr('class', 'line-act')
+        .attr('d', activityLine);
+    
+    // Add points
+    chart.selectAll('.point')
+        .data(avgDailyData)
+        .enter()
+        .append('circle')
+        .attr('class', 'point')
+        .attr('cx', d => xScale(d.hour))
+        .attr('cy', d => yScale(d.activity))
+        .attr('r', 4)
+        .attr('fill', COLORS.act);
+    
+    // Create axes
+    const xAxis = d3.axisBottom(xScale)
+        .ticks(12)
+        .tickFormat(h => `${h}:00`);
+    
+    const yAxis = d3.axisLeft(yScale)
+        .ticks(5);
+    
+    // Add axes to chart
+    chart.append('g')
+        .attr('class', 'x-axis')
+        .attr('transform', `translate(0, ${chartHeight})`)
+        .call(xAxis);
+    
+    chart.append('g')
+        .attr('class', 'y-axis')
+        .call(yAxis);
+    
+    // Highlight active/inactive periods
+    // Mice are typically active at night (roughly 18:00-6:00)
+    const activeStartHour = 18;
+    const activeEndHour = 6;
+    
+    // Create the active period rectangle (wrapping around midnight)
+    if (activeEndHour < activeStartHour) {
+        // Evening active period (from active start to midnight)
+        chart.append('rect')
+            .attr('class', 'active-period')
+            .attr('x', xScale(activeStartHour))
+            .attr('y', 0)
+            .attr('width', xScale(24) - xScale(activeStartHour))
+            .attr('height', chartHeight)
+            .attr('fill', 'rgba(0, 0, 0, 0.1)')
+            .attr('opacity', 0.5);
+        
+        // Early morning active period (from midnight to active end)
+        chart.append('rect')
+            .attr('class', 'active-period')
+            .attr('x', xScale(0))
+            .attr('y', 0)
+            .attr('width', xScale(activeEndHour))
+            .attr('height', chartHeight)
+            .attr('fill', 'rgba(0, 0, 0, 0.1)')
+            .attr('opacity', 0.5);
+    } else {
+        chart.append('rect')
+            .attr('class', 'active-period')
+            .attr('x', xScale(activeStartHour))
+            .attr('y', 0)
+            .attr('width', xScale(activeEndHour) - xScale(activeStartHour))
+            .attr('height', chartHeight)
+            .attr('fill', 'rgba(0, 0, 0, 0.1)')
+            .attr('opacity', 0.5);
+    }
+    
+    // Add a dotted line for the overall average
+    const overallAvg = d3.mean(avgDailyData, d => d.activity);
+    
+    chart.append('line')
+        .attr('class', 'avg-line')
+        .attr('x1', 0)
+        .attr('y1', yScale(overallAvg))
+        .attr('x2', chartWidth)
+        .attr('y2', yScale(overallAvg))
+        .attr('stroke', '#888')
+        .attr('stroke-width', 1)
+        .attr('stroke-dasharray', '4,4');
+    
+    chart.append('text')
+        .attr('class', 'avg-label')
+        .attr('x', 5)
+        .attr('y', yScale(overallAvg) - 5)
+        .style('font-size', '10px')
+        .style('fill', '#888')
+        .text(`Avg: ${overallAvg.toFixed(1)}`);
+    
+    // Add axis labels
+    chart.append('text')
+        .attr('class', 'x-axis-label')
+        .attr('x', chartWidth / 2)
+        .attr('y', chartHeight + margin.bottom - 10)
+        .style('text-anchor', 'middle')
+        .text('Hour of Day');
+    
+    chart.append('text')
+        .attr('class', 'y-axis-label')
+        .attr('transform', 'rotate(-90)')
+        .attr('x', -chartHeight / 2)
+        .attr('y', -margin.left + 15)
+        .style('text-anchor', 'middle')
+        .text('Activity Level');
+    
+    // Add title
+    const mouseLabel = selectedMouse === 'average' ? 'Average' : selectedMouse;
+    const genderLabel = selectedGender === 'all' ? 'All Mice' : 
+                       (selectedGender === 'female' ? 'Female Mice' : 'Male Mice');
+    
+    svg.append('text')
+        .attr('class', 'chart-title')
+        .attr('x', width / 2)
+        .attr('y', 15)
+        .attr('text-anchor', 'middle')
+        .style('font-weight', 'bold')
+        .text(`${mouseLabel} Activity - ${genderLabel}`);
+}
+
+// Create a 24-hour temperature pattern chart
+function createDailyTempChart() {
+    const { tempData } = getFilteredData();
+    const mouseIds = getMouseIds();
+    
+    // Container dimensions
+    const container = document.getElementById('daily-temp-chart');
+    const width = container.clientWidth;
+    const height = container.clientHeight || 400;
+    const margin = { top: 30, right: 30, bottom: 60, left: 60 };
+    const chartWidth = width - margin.left - margin.right;
+    const chartHeight = height - margin.top - margin.bottom;
+    
+    // Create SVG
+    const svg = d3.select('#daily-temp-chart')
+        .append('svg')
+        .attr('width', width)
+        .attr('height', height);
+    
+    // Create chart group
+    const chart = svg.append('g')
+        .attr('transform', `translate(${margin.left}, ${margin.top})`);
+    
+    // Calculate hourly averages
+    const hourlyData = calculateHourlyAverages(tempData, mouseIds);
+    
+    // Use a different array for days in the dataset
+    const dayCount = Math.floor(tempData.length / (24 * 60));
+    const daysData = [];
+    
+    // For each day in the dataset
+    for (let day = 0; day < dayCount; day++) {
+        // Get data for this day
+        const start = day * 24;
+        const end = start + 24;
+        const dayHours = hourlyData.slice(start, end);
+        
+        // Skip if we don't have 24 hours
+        if (dayHours.length < 24) continue;
+        
+        // Plot this day's data
+        const dayData = dayHours.map((hour, i) => ({
+            hour: i,
+            temperature: selectedMouse === 'average' ? hour.average : hour[selectedMouse] || 0
+        }));
+        
+        daysData.push(dayData);
+    }
+    
+    // Calculate the average across all days for each hour
+    const avgDailyData = Array(24).fill().map((_, hour) => {
+        const hourValues = daysData.map(day => day[hour].temperature).filter(v => !isNaN(v));
+        return {
+            hour,
+            temperature: hourValues.length > 0 ? d3.mean(hourValues) : 0
+        };
+    });
+    
+    // Create scales
+    const xScale = d3.scaleLinear()
+        .domain([0, 23])
+        .range([0, chartWidth]);
+    
+    const yScale = d3.scaleLinear()
+        .domain([
+            d3.min(avgDailyData, d => d.temperature) * 0.99,
+            d3.max(avgDailyData, d => d.temperature) * 1.01
+        ])
+        .range([chartHeight, 0]);
+    
+    // Create line
+    const temperatureLine = d3.line()
+        .x(d => xScale(d.hour))
+        .y(d => yScale(d.temperature))
+        .curve(d3.curveMonotoneX);
+    
+    // Add area
+    chart.append('path')
+        .datum(avgDailyData)
+        .attr('class', 'area-temp')
+        .attr('d', d3.area()
+            .x(d => xScale(d.hour))
+            .y0(chartHeight)
+            .y1(d => yScale(d.temperature))
+            .curve(d3.curveMonotoneX)
+        );
+    
+    // Add line
+    chart.append('path')
+        .datum(avgDailyData)
+        .attr('class', 'line-temp')
+        .attr('d', temperatureLine);
+    
+    // Add points
+    chart.selectAll('.point')
+        .data(avgDailyData)
+        .enter()
+        .append('circle')
+        .attr('class', 'point')
+        .attr('cx', d => xScale(d.hour))
+        .attr('cy', d => yScale(d.temperature))
+        .attr('r', 4)
+        .attr('fill', COLORS.temp);
+    
+    // Create axes
+    const xAxis = d3.axisBottom(xScale)
+        .ticks(12)
+        .tickFormat(h => `${h}:00`);
+    
+    const yAxis = d3.axisLeft(yScale)
+        .ticks(5)
+        .tickFormat(d => `${d.toFixed(1)}°C`);
+    
+    // Add axes to chart
+    chart.append('g')
+        .attr('class', 'x-axis')
+        .attr('transform', `translate(0, ${chartHeight})`)
+        .call(xAxis);
+    
+    chart.append('g')
+        .attr('class', 'y-axis')
+        .call(yAxis);
+    
+    // Highlight active/inactive periods (same as in activity chart)
+    const activeStartHour = 18;
+    const activeEndHour = 6;
+    
+    // Create the active period rectangle (wrapping around midnight)
+    if (activeEndHour < activeStartHour) {
+        // Evening active period (from active start to midnight)
+        chart.append('rect')
+            .attr('class', 'active-period')
+            .attr('x', xScale(activeStartHour))
+            .attr('y', 0)
+            .attr('width', xScale(24) - xScale(activeStartHour))
+            .attr('height', chartHeight)
+            .attr('fill', 'rgba(0, 0, 0, 0.1)')
+            .attr('opacity', 0.5);
+        
+        // Early morning active period (from midnight to active end)
+        chart.append('rect')
+            .attr('class', 'active-period')
+            .attr('x', xScale(0))
+            .attr('y', 0)
+            .attr('width', xScale(activeEndHour))
+            .attr('height', chartHeight)
+            .attr('fill', 'rgba(0, 0, 0, 0.1)')
+            .attr('opacity', 0.5);
+    } else {
+        chart.append('rect')
+            .attr('class', 'active-period')
+            .attr('x', xScale(activeStartHour))
+            .attr('y', 0)
+            .attr('width', xScale(activeEndHour) - xScale(activeStartHour))
+            .attr('height', chartHeight)
+            .attr('fill', 'rgba(0, 0, 0, 0.1)')
+            .attr('opacity', 0.5);
+    }
+    
+    // Add a dotted line for the overall average
+    const overallAvg = d3.mean(avgDailyData, d => d.temperature);
+    
+    chart.append('line')
+        .attr('class', 'avg-line')
+        .attr('x1', 0)
+        .attr('y1', yScale(overallAvg))
+        .attr('x2', chartWidth)
+        .attr('y2', yScale(overallAvg))
+        .attr('stroke', '#888')
+        .attr('stroke-width', 1)
+        .attr('stroke-dasharray', '4,4');
+    
+    chart.append('text')
+        .attr('class', 'avg-label')
+        .attr('x', 5)
+        .attr('y', yScale(overallAvg) - 5)
+        .style('font-size', '10px')
+        .style('fill', '#888')
+        .text(`Avg: ${overallAvg.toFixed(2)}°C`);
+    
+    // Add axis labels
+    chart.append('text')
+        .attr('class', 'x-axis-label')
+        .attr('x', chartWidth / 2)
+        .attr('y', chartHeight + margin.bottom - 10)
+        .style('text-anchor', 'middle')
+        .text('Hour of Day');
+    
+    chart.append('text')
+        .attr('class', 'y-axis-label')
+        .attr('transform', 'rotate(-90)')
+        .attr('x', -chartHeight / 2)
+        .attr('y', -margin.left + 15)
+        .style('text-anchor', 'middle')
+        .text('Temperature (°C)');
+    
+    // Add title
+    const mouseLabel = selectedMouse === 'average' ? 'Average' : selectedMouse;
+    const genderLabel = selectedGender === 'all' ? 'All Mice' : 
+                       (selectedGender === 'female' ? 'Female Mice' : 'Male Mice');
+    
+    svg.append('text')
+        .attr('class', 'chart-title')
+        .attr('x', width / 2)
+        .attr('y', 15)
+        .attr('text-anchor', 'middle')
+        .style('font-weight', 'bold')
+        .text(`${mouseLabel} Temperature - ${genderLabel}`);
+}
+
+// Create a gender comparison chart for temperature-activity correlation
+function createGenderComparisonChart() {
+    // Container dimensions
+    const container = document.getElementById('gender-comparison-chart');
+    const width = container.clientWidth;
+    const height = container.clientHeight || 400;
+    const margin = { top: 30, right: 30, bottom: 60, left: 60 };
+    const chartWidth = width - margin.left - margin.right;
+    const chartHeight = height - margin.top - margin.bottom;
+    
+    // Create SVG
+    const svg = d3.select('#gender-comparison-chart')
+        .append('svg')
+        .attr('width', width)
+        .attr('height', height);
+    
+    // Create chart group
+    const chart = svg.append('g')
+        .attr('transform', `translate(${margin.left}, ${margin.top})`);
+    
+    // Calculate correlations for each mouse
+    function calculateMouseCorrelation(actData, tempData, mouseId) {
+        const activities = actData.map(d => parseFloat(d[mouseId])).filter(v => !isNaN(v));
+        const temperatures = tempData.map(d => parseFloat(d[mouseId])).filter(v => !isNaN(v));
+        
+        // Use the minimum length of both arrays
+        const n = Math.min(activities.length, temperatures.length);
+        
+        if (n < 10) return 0; // Not enough data
+        
+        let sumAct = 0, sumTemp = 0, sumActTemp = 0, sumActSq = 0, sumTempSq = 0;
+        
+        for (let i = 0; i < n; i++) {
+            sumAct += activities[i];
+            sumTemp += temperatures[i];
+            sumActTemp += activities[i] * temperatures[i];
+            sumActSq += activities[i] * activities[i];
+            sumTempSq += temperatures[i] * temperatures[i];
+        }
+        
+        const numerator = n * sumActTemp - sumAct * sumTemp;
+        const denominator = Math.sqrt((n * sumActSq - sumAct * sumAct) * (n * sumTempSq - sumTemp * sumTemp));
+        
+        return denominator === 0 ? 0 : numerator / denominator;
+    }
+    
+    // Calculate correlations
+    const femaleIds = ['f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'f10', 'f11', 'f12', 'f13'];
+    const maleIds = ['m1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7', 'm8', 'm9', 'm10', 'm11', 'm12', 'm13'];
+    
+    const femaleCorrelations = femaleIds.map(id => {
+        return {
+            id,
+            correlation: calculateMouseCorrelation(femActData, femTempData, id)
+        };
+    });
+    
+    const maleCorrelations = maleIds.map(id => {
+        return {
+            id,
+            correlation: calculateMouseCorrelation(maleActData, maleTempData, id)
+        };
+    });
+    
+    // Calculate average correlations
+    const avgFemaleCorrelation = d3.mean(femaleCorrelations, d => d.correlation);
+    const avgMaleCorrelation = d3.mean(maleCorrelations, d => d.correlation);
+    
+    // Prepare data for the chart
+    const data = [
+        { gender: 'Female', value: avgFemaleCorrelation },
+        { gender: 'Male', value: avgMaleCorrelation }
+    ];
+    
+    // Create scales
+    const xScale = d3.scaleBand()
+        .domain(data.map(d => d.gender))
+        .range([0, chartWidth])
+        .padding(0.4);
+    
+    const yScale = d3.scaleLinear()
+        .domain([0, Math.max(avgFemaleCorrelation, avgMaleCorrelation) * 1.1])
+        .range([chartHeight, 0]);
+    
+    // Create color scale
+    const colorScale = d => d.gender === 'Female' ? COLORS.female : COLORS.male;
+    
+    // Add bars
+    chart.selectAll('.bar')
+        .data(data)
+        .enter()
+        .append('rect')
+        .attr('class', 'bar')
+        .attr('x', d => xScale(d.gender))
+        .attr('y', d => yScale(d.value))
+        .attr('width', xScale.bandwidth())
+        .attr('height', d => chartHeight - yScale(d.value))
+        .attr('fill', d => colorScale(d));
+    
+    // Add bar values
+    chart.selectAll('.bar-value')
+        .data(data)
+        .enter()
+        .append('text')
+        .attr('class', 'bar-value')
+        .attr('x', d => xScale(d.gender) + xScale.bandwidth() / 2)
+        .attr('y', d => yScale(d.value) - 5)
+        .attr('text-anchor', 'middle')
+        .style('font-size', '12px')
+        .text(d => d.value.toFixed(3));
+    
+    // Create axes
+    const xAxis = d3.axisBottom(xScale);
+    
+    const yAxis = d3.axisLeft(yScale)
+        .ticks(5);
+    
+    // Add axes to chart
+    chart.append('g')
+        .attr('class', 'x-axis')
+        .attr('transform', `translate(0, ${chartHeight})`)
+        .call(xAxis);
+    
+    chart.append('g')
+        .attr('class', 'y-axis')
+        .call(yAxis);
+    
+    // Add axis labels
+    chart.append('text')
+        .attr('class', 'y-axis-label')
+        .attr('transform', 'rotate(-90)')
+        .attr('x', -chartHeight / 2)
+        .attr('y', -margin.left + 15)
+        .style('text-anchor', 'middle')
+        .text('Correlation Coefficient (r)');
+    
+    // Add title
+    svg.append('text')
+        .attr('class', 'chart-title')
+        .attr('x', width / 2)
+        .attr('y', 15)
+        .attr('text-anchor', 'middle')
+        .style('font-weight', 'bold')
+        .text('Gender Comparison: Temperature-Activity Correlation');
+    
+    // Add interpretation
+    chart.append('text')
+        .attr('class', 'interpretation')
+        .attr('x', chartWidth / 2)
+        .attr('y', chartHeight + 40)
+        .attr('text-anchor', 'middle')
+        .style('font-size', '12px')
+        .text('Higher values indicate stronger correlation between temperature and activity');
+}
+
+// Create a heatmap to visualize activity patterns by hour and day
+function createActivityHeatmap() {
+    // Container dimensions
+    const container = document.getElementById('activity-heatmap');
+    const width = container.clientWidth;
+    const height = container.clientHeight || 400;
+    const margin = { top: 30, right: 30, bottom: 60, left: 60 };
+    const chartWidth = width - margin.left - margin.right;
+    const chartHeight = height - margin.top - margin.bottom;
+    
+    // Create SVG
+    const svg = d3.select('#activity-heatmap')
+        .append('svg')
+        .attr('width', width)
+        .attr('height', height);
+    
+    // Create chart group
+    const chart = svg.append('g')
+        .attr('transform', `translate(${margin.left}, ${margin.top})`);
+    
+    // Get data based on selected gender and mouse
+    let actData;
+    if (selectedGender === 'female') {
+        actData = femActData;
+    } else if (selectedGender === 'male') {
+        actData = maleActData;
+    } else {
+        // Combine data for 'all' gender selection
+        actData = femActData.map((row, i) => {
+            const combined = {};
+            // Include female data
+            for (const key in row) {
+                combined[key] = parseFloat(row[key]);
+            }
+            // Include male data if available
+            if (i < maleActData.length) {
+                for (const key in maleActData[i]) {
+                    combined[key] = parseFloat(maleActData[i][key]);
+                }
+            }
+            return combined;
+        });
+    }
+    
+    // Calculate number of days to show
+    let days;
+    switch (selectedPeriod) {
+        case '24h':
+            days = 1;
+            break;
+        case '7d':
+            days = 7;
+            break;
+        case '14d':
+            days = 14;
+            break;
+        default:
+            days = 1;
+    }
+    
+    // Limit days to available data
+    const maxDays = Math.floor(actData.length / (24 * 60));
+    days = Math.min(days, maxDays);
+    
+    // Get mouse IDs relevant to the selection
+    const mouseIds = getMouseIds();
+    
+    // Prepare data for heatmap
+    const heatmapData = [];
+    
+    // For each day
+    for (let day = 0; day < days; day++) {
+        // For each hour in the day
+        for (let hour = 0; hour < 24; hour++) {
+            // Calculate the starting and ending minute indices
+            const startMinute = day * 24 * 60 + hour * 60;
+            const endMinute = startMinute + 60;
+            
+            // Skip if we don't have data for this time period
+            if (endMinute >= actData.length) continue;
+            
+            // Get activity data for this hour
+            const hourData = actData.slice(startMinute, endMinute);
+            
+            // Calculate average activity for this hour
+            let activity;
+            
+            if (selectedMouse === 'average') {
+                // Calculate average across all mice
+                let sum = 0;
+                let count = 0;
+                
+                hourData.forEach(minute => {
+                    mouseIds.forEach(id => {
+                        if (!isNaN(minute[id])) {
+                            sum += minute[id];
+                            count++;
+                        }
+                    });
+                });
+                
+                activity = count > 0 ? sum / count : 0;
+            } else {
+                // Calculate average for specific mouse
+                const values = hourData.map(minute => minute[selectedMouse])
+                                     .filter(v => !isNaN(v));
+                activity = values.length > 0 ? d3.mean(values) : 0;
+            }
+            
+            heatmapData.push({
+                day,
+                hour,
+                activity
+            });
+        }
+    }
+    
+    // Create scales
+    const xScale = d3.scaleBand()
+        .domain(d3.range(24))
+        .range([0, chartWidth])
+        .padding(0.05);
+    
+    const yScale = d3.scaleBand()
+        .domain(d3.range(days))
+        .range([0, chartHeight])
+        .padding(0.05);
+    
+    // Create color scale
+    const colorScale = d3.scaleSequential(d3.interpolateBlues)
+        .domain([0, d3.max(heatmapData, d => d.activity) * 1.1]);
+    
+    // Add heatmap cells
+    chart.selectAll('.cell')
+        .data(heatmapData)
+        .enter()
+        .append('rect')
+        .attr('class', 'cell')
+        .attr('x', d => xScale(d.hour))
+        .attr('y', d => yScale(d.day))
+        .attr('width', xScale.bandwidth())
+        .attr('height', yScale.bandwidth())
+        .attr('fill', d => colorScale(d.activity))
+        .on('mouseover', function(event, d) {
+            // Show tooltip on hover
+            const tooltip = d3.select('body')
+                .append('div')
+                .attr('class', 'tooltip')
+                .style('left', `${event.pageX + 10}px`)
+                .style('top', `${event.pageY + 10}px`);
+            
+            tooltip.html(`
+                <strong>Day ${d.day + 1}, ${d.hour}:00</strong><br>
+                Activity: ${d.activity.toFixed(2)}
+            `);
+        })
+        .on('mouseout', function() {
+            // Remove tooltip on mouseout
+            d3.selectAll('.tooltip').remove();
+        });
+    
+    // Create axes
+    const xAxis = d3.axisBottom(xScale)
+        .tickFormat(d => `${d}:00`);
+    
+    const yAxis = d3.axisLeft(yScale)
+        .tickFormat(d => `Day ${d + 1}`);
+    
+    // Add axes to chart
+    chart.append('g')
+        .attr('class', 'x-axis')
+        .attr('transform', `translate(0, ${chartHeight})`)
+        .call(xAxis)
+        .selectAll('text')
+        .style('text-anchor', 'end')
+        .attr('dx', '-.8em')
+        .attr('dy', '.15em')
+        .attr('transform', 'rotate(-45)');
+    
+    chart.append('g')
+        .attr('class', 'y-axis')
+        .call(yAxis);
+    
+    // Add color legend
+    const legendWidth = 20;
+    const legendHeight = chartHeight;
+    
+    const legend = svg.append('g')
+        .attr('class', 'legend')
+        .attr('transform', `translate(${width - margin.right - legendWidth}, ${margin.top})`);
+    
+    // Create gradient for legend
+    const defs = svg.append('defs');
+    
+    const gradient = defs.append('linearGradient')
+        .attr('id', 'activity-gradient')
+        .attr('x1', '0%')
+        .attr('y1', '100%')
+        .attr('x2', '0%')
+        .attr('y2', '0%');
+    
+    // Add color stops
+    const colorDomain = colorScale.domain();
+    gradient.append('stop')
+        .attr('offset', '0%')
+        .attr('stop-color', colorScale(colorDomain[0]));
+    
+    gradient.append('stop')
+        .attr('offset', '100%')
+        .attr('stop-color', colorScale(colorDomain[1]));
+    
+    // Add gradient rectangle
+    legend.append('rect')
+        .attr('width', legendWidth)
+        .attr('height', legendHeight)
+        .style('fill', 'url(#activity-gradient)');
+    
+    // Add legend axis
+    const legendScale = d3.scaleLinear()
+        .domain(colorDomain)
+        .range([legendHeight, 0]);
+    
+    const legendAxis = d3.axisRight(legendScale)
+        .ticks(5);
+    
+    legend.append('g')
+        .attr('transform', `translate(${legendWidth}, 0)`)
+        .call(legendAxis);
+    
+    // Add axis labels
+    chart.append('text')
+        .attr('class', 'x-axis-label')
+        .attr('x', chartWidth / 2)
+        .attr('y', chartHeight + margin.bottom - 10)
+        .style('text-anchor', 'middle')
+        .text('Hour of Day');
+    
+    chart.append('text')
+        .attr('class', 'y-axis-label')
+        .attr('transform', 'rotate(-90)')
+        .attr('x', -chartHeight / 2)
+        .attr('y', -margin.left + 15)
+        .style('text-anchor', 'middle')
+        .text('Day');
+    
+    // Add title
+    const mouseLabel = selectedMouse === 'average' ? 'Average' : selectedMouse;
+    const genderLabel = selectedGender === 'all' ? 'All Mice' : 
+                       (selectedGender === 'female' ? 'Female Mice' : 'Male Mice');
+    
+    svg.append('text')
+        .attr('class', 'chart-title')
+        .attr('x', width / 2)
+        .attr('y', 15)
+        .attr('text-anchor', 'middle')
+        .style('font-weight', 'bold')
+        .text(`Activity Heatmap: ${mouseLabel} - ${genderLabel}`);
+}
+
+function initializeMouseDropdown() {
+    const mouseSelect = document.getElementById('mouse-select');
+    
+    // Clear existing options except 'average'
+    while (mouseSelect.options.length > 1) {
+        mouseSelect.remove(1);
+    }
+    
+    // Get mouse IDs based on current gender selection
+    const mouseIds = selectedGender === 'female' ? 
+                    ['f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'f10', 'f11', 'f12', 'f13'] :
+                    ['m1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7', 'm8', 'm9', 'm10', 'm11', 'm12', 'm13'];
+    
+    // Add appropriate mouse options
+    mouseIds.forEach((id, index) => {
+        const option = document.createElement('option');
+        option.value = id;
+        option.text = `${selectedGender === 'female' ? 'Female' : 'Male'} ${index + 1}`;
+        mouseSelect.add(option);
+    });
+    
+    // Set dropdown to "average" by default
+    mouseSelect.value = 'average';
+}
+
+// Update summary text with key findings
+function updateSummaryText() {
+    // Calculate correlations based on current selection
+    function calculateCorrelation(actData, tempData, mouseId) {
+        const activities = actData.map(d => parseFloat(d[mouseId])).filter(v => !isNaN(v));
+        const temperatures = tempData.map(d => parseFloat(d[mouseId])).filter(v => !isNaN(v));
+        
+        // Use the minimum length of both arrays
+        const n = Math.min(activities.length, temperatures.length);
+        
+        if (n < 10) return 0; // Not enough data
+        
+        let sumAct = 0, sumTemp = 0, sumActTemp = 0, sumActSq = 0, sumTempSq = 0;
+        
+        for (let i = 0; i < n; i++) {
+            sumAct += activities[i];
+            sumTemp += temperatures[i];
+            sumActTemp += activities[i] * temperatures[i];
+            sumActSq += activities[i] * activities[i];
+            sumTempSq += temperatures[i] * temperatures[i];
+        }
+        
+        const numerator = n * sumActTemp - sumAct * sumTemp;
+        const denominator = Math.sqrt((n * sumActSq - sumAct * sumAct) * (n * sumTempSq - sumTemp * sumTemp));
+        
+        return denominator === 0 ? 0 : numerator / denominator;
+    }
+    
+    // Get correlations for female and male mice
+    const femaleIds = ['f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'f10', 'f11', 'f12', 'f13'];
+    const maleIds = ['m1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7', 'm8', 'm9', 'm10', 'm11', 'm12', 'm13'];
+    
+    const femaleCorrelations = femaleIds.map(id => {
+        return {
+            id,
+            correlation: calculateCorrelation(femActData, femTempData, id)
+        };
+    });
+    
+    const maleCorrelations = maleIds.map(id => {
+        return {
+            id,
+            correlation: calculateCorrelation(maleActData, maleTempData, id)
+        };
+    });
+    
+    // Calculate average correlations
+    const avgFemaleCorrelation = d3.mean(femaleCorrelations, d => d.correlation);
+    const avgMaleCorrelation = d3.mean(maleCorrelations, d => d.correlation);
+    
+    // Update correlation summary
+    document.getElementById('correlation-summary').innerHTML = `
+        <h3>Temperature-Activity Correlation</h3>
+        <p>
+            The data shows a <strong>${avgFemaleCorrelation > 0.5 ? 'strong' : avgFemaleCorrelation > 0.3 ? 'moderate' : 'weak'} positive correlation</strong> between body temperature and activity level in female mice (r = ${avgFemaleCorrelation.toFixed(3)}) and a
+            <strong>${avgMaleCorrelation > 0.5 ? 'strong' : avgMaleCorrelation > 0.3 ? 'moderate' : 'weak'} positive correlation</strong> in male mice (r = ${avgMaleCorrelation.toFixed(3)}).
+            ${avgFemaleCorrelation > avgMaleCorrelation ? 
+            'Female mice show a stronger correlation between temperature and activity compared to males.' : 
+            'Male mice show a stronger correlation between temperature and activity compared to females.'}
+        </p>
+        <p>
+            This suggests that ${avgFemaleCorrelation > 0.5 || avgMaleCorrelation > 0.5 ? 
+            'hotter mice do tend to move more, with body temperature rising as activity increases.' : 
+            'the relationship between body temperature and activity is not as strong as hypothesized, though there is some positive correlation.'}
+        </p>
+    `;
+    
+    // Update conclusion
+    document.getElementById('conclusion-text').innerHTML = `
+        Based on our analysis, we can conclude that there is a ${avgFemaleCorrelation > 0.5 && avgMaleCorrelation > 0.5 ? 'strong' : 'moderate'} positive correlation between body temperature and activity levels in mice, 
+        supporting the hypothesis that hotter mice tend to move more. This relationship is ${avgFemaleCorrelation > avgMaleCorrelation ? 'stronger in females than males' : 'stronger in males than females'}, 
+        and both genders exhibit clear circadian rhythms that influence both temperature and activity patterns.
+        
+        Female mice maintain higher body temperatures on average, and their estrus cycles appear to influence temperature fluctuations, which may in turn affect activity levels.
+        
+        These findings suggest that body temperature is an important physiological parameter that is closely linked to activity levels in mice, 
+        and monitoring temperature could provide valuable insights into behavioral patterns and overall health.
+    `;
+}
