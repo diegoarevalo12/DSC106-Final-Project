@@ -3,38 +3,164 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mouse Activity & Temperature</title>
+    <title>Mouse Temperature & Activity Analysis</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
 </head>
 <body>
-    <h1>The Relationship Between Temperature and Activity: Do Hotter Mice Move More?</h1>
-    <div id="chart-container">
-        <h3 id="gender-subtitle"></h3>
-        <div id="chart"></div>
-    </div>    
-    <div class="tooltip" style="position: absolute; visibility: hidden; background: lightgray; padding: 5px; border-radius: 5px;"></div>
-    <div id="controls">
-        <button id="showFemales">Female Mice</button>
-        <button id="showMales">Male Mice</button>
-    </div>
+    <header>
+        <h1>The Relationship Between Temperature and Activity: Do Hotter Mice Move More?</h1>
+        <div class="authors">
+            <p>By: Tommy Li, Khoi Phan, Diego Arevalo</p>
+        </div>
+    </header>
 
-    <h2 id="visualization-title" style="text-align: center; margin-bottom: 10px;">
-        Temperature and Activity of Female Mice Over Time
-    </h2>
-    <div id="chart2-container">
-        <button id="playPause">Play</button>
-        <button id="resetButton">Reset</button>
-        <div id="chart2"></div>
-    </div>    
+    <main>
+        <section class="introduction">
+            <h2>Introduction</h2>
+            <p>
+                This interactive dashboard explores the relationship between body temperature and physical activity in mice. 
+                We analyze data from multiple mice of both sexes, looking at how temperature and activity levels fluctuate 
+                throughout a 24-hour cycle and whether there's a correlation between the two variables. We also investigate 
+                potential gender differences and the impact of factors like estrus periods in female mice.
+            </p>
+        </section>
 
-    <h2>Team Members</h2>
-    <ul>
-        <li>Khoi Phan (k8phan@ucsd.edu)</li>
-        <li>Diego Arevalo-Fernandez (darevalofernandez@ucsd.edu)</li>
-        <li>Tommy Li (wal016@ucsd.edu)</li>
-      </ul>
+        <section class="visualization-container">
+            <div class="controls">
+                <div class="control-group">
+                    <label for="gender-select">Select Gender:</label>
+                    <select id="gender-select">
+                        <option value="female">Female</option>
+                        <option value="male">Male</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label for="time-period">Time Period:</label>
+                    <select id="time-period">
+                        <option value="24h">24 Hours</option>
+                        <option value="7d">7 Days</option>
+                        <option value="14d">14 Days</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label for="mouse-select">Mouse ID:</label>
+                    <select id="mouse-select">
+                        <option value="average">Average (All Mice)</option>
+                        <option value="f1">Female 1</option>
+                        <option value="f2">Female 2</option>
+                        <option value="f3">Female 3</option>
+                        <option value="f4">Female 4</option>
+                        <option value="f5">Female 5</option>
+                        <option value="f6">Female 6</option>
+                        <option value="f7">Female 7</option>
+                        <option value="f8">Female 8</option>
+                        <option value="f9">Female 9</option>
+                        <option value="f10">Female 10</option>
+                        <option value="f11">Female 11</option>
+                        <option value="f12">Female 12</option>
+                        <option value="f13">Female 13</option>
+                        <option value="m1">Male 1</option>
+                        <option value="m2">Male 2</option>
+                        <option value="m3">Male 3</option>
+                        <option value="m4">Male 4</option>
+                        <option value="m5">Male 5</option>
+                        <option value="m6">Male 6</option>
+                        <option value="m7">Male 7</option>
+                        <option value="m8">Male 8</option>
+                        <option value="m9">Male 9</option>
+                        <option value="m10">Male 10</option>
+                        <option value="m11">Male 11</option>
+                        <option value="m12">Male 12</option>
+                        <option value="m13">Male 13</option>
+                    </select>
+                </div>
+            </div>
 
-      <script type="module" src="main.js" defer></script>
+            <div class="viz-row">
+                <div class="viz-card">
+                    <h3>Temperature & Activity Over Time</h3>
+                    <div id="time-series-chart" class="chart-container"></div>
+                    <p class="chart-description">
+                        This visualization shows how temperature (red) and activity (blue) change over time. 
+                        Notice the cyclical patterns and how temperature and activity often peak and decline together.
+                    </p>
+                </div>
+            </div>
+
+            <div class="viz-row">
+                <div class="viz-card">
+                    <h3>Correlation Between Temperature and Activity</h3>
+                    <div id="scatter-plot" class="chart-container"></div>
+                    <p class="chart-description">
+                        Each point represents a moment in time. Points that form a trend from bottom-left to top-right 
+                        indicate a positive correlation: as temperature increases, so does activity.
+                    </p>
+                </div>
+            </div>
+
+            <div class="viz-row">
+                <div class="viz-card half">
+                    <h3>24-Hour Activity Pattern</h3>
+                    <div id="daily-activity-chart" class="chart-container"></div>
+                    <p class="chart-description">
+                        This chart shows average activity levels throughout a 24-hour cycle, 
+                        highlighting nocturnal patterns in mice behavior.
+                    </p>
+                </div>
+                <div class="viz-card half">
+                    <h3>24-Hour Temperature Pattern</h3>
+                    <div id="daily-temp-chart" class="chart-container"></div>
+                    <p class="chart-description">
+                        This chart shows average body temperature throughout a 24-hour cycle, 
+                        allowing us to observe daily fluctuations.
+                    </p>
+                </div>
+            </div>
+
+            <div class="viz-row">
+                <div class="viz-card">
+                    <h3>Gender Comparison: Temperature vs Activity Correlation</h3>
+                    <div id="gender-comparison-chart" class="chart-container"></div>
+                    <p class="chart-description">
+                        This visualization compares how strongly temperature and activity are correlated in male and female mice. 
+                        Bar height represents correlation strength (higher = stronger relationship).
+                    </p>
+                </div>
+            </div>
+
+            <div class="viz-row">
+                <div class="viz-card">
+                    <h3>Heatmap: Activity by Hour of Day</h3>
+                    <div id="activity-heatmap" class="chart-container"></div>
+                    <p class="chart-description">
+                        This heatmap shows activity patterns across different days and hours. 
+                        Darker blue indicates higher activity levels.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <section class="key-findings">
+            <h2>Key Findings</h2>
+            <div id="correlation-summary"></div>
+        </section>
+
+        <section class="conclusion">
+            <h2>Conclusion</h2>
+            <p id="conclusion-text">
+                Based on our analysis of mice temperature and activity data, we can draw several conclusions about the relationship 
+                between these variables and how they differ between genders. Our findings will be dynamically updated based on the 
+                interactive visualizations above.
+            </p>
+        </section>
+    </main>
+
+    <footer>
+        <p>DSC 106 Final Project - Data Visualization</p>
+    </footer>
+
+    <script src="main.js"></script>
 </body>
 </html>

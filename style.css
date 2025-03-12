@@ -1,79 +1,204 @@
-body {
-    font-family: Arial, sans-serif;
+/* Basic Reset */
+* {
     margin: 0;
     padding: 0;
-    background-color: #f4f4f4;
+    box-sizing: border-box;
 }
 
-h1 {
-    text-align: center;
-    margin-top: 20px;
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    line-height: 1.6;
     color: #333;
+    background-color: #f7f9fc;
+    padding-bottom: 2rem;
 }
 
-#gender-subtitle {
+/* Header Styles */
+header {
+    background-color: #1e3a8a;
+    color: white;
+    padding: 2rem;
     text-align: center;
-    font-size: 18px;
-    font-weight: bold;
-    color: #444;
-    margin-bottom: 10px;
 }
 
-#chart {
-    width: 80%;
-    max-width: 850px;
-    height: 450px;
-    margin: 20px auto;
-    background-color: #fff;
-    border: 1px solid #ddd;
+header h1 {
+    margin-bottom: 0.5rem;
+    font-size: 2rem;
+}
+
+.authors {
+    font-style: italic;
+    opacity: 0.9;
+}
+
+/* Main Content */
+main {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+section {
+    margin-bottom: 3rem;
+}
+
+h2 {
+    color: #1e3a8a;
+    margin-bottom: 1rem;
+    border-bottom: 2px solid #e2e8f0;
+    padding-bottom: 0.5rem;
+}
+
+h3 {
+    color: #2563eb;
+    margin-bottom: 1rem;
+}
+
+p {
+    margin-bottom: 1rem;
+}
+
+/* Control Panel */
+.controls {
+    background-color: #e2e8f0;
     border-radius: 8px;
-    padding: 20px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-#controls {
+    padding: 1rem;
+    margin-bottom: 2rem;
     display: flex;
-    justify-content: center;
-    gap: 10px;
-    margin: 20px 0;
+    flex-wrap: wrap;
+    gap: 1rem;
 }
 
-#chart2-container {
-    margin-top: 20px;
-    text-align: center;
+.control-group {
+    display: flex;
+    flex-direction: column;
+    min-width: 150px;
 }
 
-#visualization-title {
-    font-size: 24px;
-    font-weight: bold;
-    text-align: center;
-    margin-top: 150px;
+label {
+    margin-bottom: 0.5rem;
+    font-weight: 600;
 }
 
-#playPause {
-    padding: 8px 15px;
-    font-size: 14px;
-    background-color: #007bff;
+select {
+    padding: 0.5rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 4px;
+    background-color: white;
+    font-size: 0.9rem;
+}
+
+/* Visualization Cards */
+.viz-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+.viz-card {
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    padding: 1.5rem;
+    flex: 1 1 100%;
+}
+
+.viz-card.half {
+    flex: 1 1 calc(50% - 1rem);
+    min-width: 300px;
+}
+
+.chart-container {
+    height: 400px;
+    margin-bottom: 1rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.chart-description {
+    font-size: 0.9rem;
+    color: #64748b;
+}
+
+/* SVG and D3 Styling */
+.axis path,
+.axis line {
+    stroke: #cbd5e1;
+}
+
+.axis text {
+    fill: #64748b;
+    font-size: 12px;
+}
+
+.line-temp {
+    stroke: #ef4444;
+    stroke-width: 2;
+    fill: none;
+}
+
+.line-act {
+    stroke: #3b82f6;
+    stroke-width: 2;
+    fill: none;
+}
+
+.area-temp {
+    fill: rgba(239, 68, 68, 0.1);
+}
+
+.area-act {
+    fill: rgba(59, 130, 246, 0.1);
+}
+
+.tooltip {
+    position: absolute;
+    padding: 10px;
+    background-color: rgba(0, 0, 0, 0.8);
     color: white;
-    border: none;
-    cursor: pointer;
-    margin-bottom: 10px;
+    border-radius: 4px;
+    pointer-events: none;
+    font-size: 12px;
+    z-index: 100;
 }
 
-#playPause:hover {
-    background-color: #0056b3;
+.female-color {
+    color: #db2777;
 }
 
-#resetButton {
-    padding: 8px 15px;
-    font-size: 14px;
-    background-color: #007bff;
+.male-color {
+    color: #2563eb;
+}
+
+/* Key Findings Section */
+.key-findings div {
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+/* Footer */
+footer {
+    text-align: center;
+    padding: 1rem;
+    background-color: #1e3a8a;
     color: white;
-    border: none;
-    cursor: pointer;
-    margin-bottom: 10px;
+    position: fixed;
+    bottom: 0;
+    width: 100%;
 }
 
-#resetButton:hover {
-    background-color: #0056b3;
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    .viz-card.half {
+        flex: 1 1 100%;
+    }
+    
+    header h1 {
+        font-size: 1.5rem;
+    }
 }
