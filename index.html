@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mouse Temperature & Activity Analysis</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🐭</text></svg>">
     <link rel="stylesheet" href="style.css">
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
@@ -121,22 +122,22 @@
 
             <div class="viz-row">
                 <div class="viz-card">
-                    <h3>Gender Comparison: Temperature vs Activity Correlation</h3>
-                    <div id="gender-comparison-chart" class="chart-container"></div>
+                    <h3>Heatmap: Activity by Hour of Day</h3>
+                    <div id="activity-heatmap" class="chart-container"></div>
                     <p class="chart-description">
-                        This visualization compares how strongly temperature and activity are correlated in male and female mice. 
-                        Bar height represents correlation strength (higher = stronger relationship).
+                        This heatmap shows activity patterns across different days and hours. 
+                        Darker blue indicates higher activity levels.
                     </p>
                 </div>
             </div>
 
             <div class="viz-row">
                 <div class="viz-card">
-                    <h3>Heatmap: Activity by Hour of Day</h3>
-                    <div id="activity-heatmap" class="chart-container"></div>
+                    <h3>Gender Comparison: Temperature vs Activity Correlation</h3>
+                    <div id="gender-comparison-chart" class="chart-container"></div>
                     <p class="chart-description">
-                        This heatmap shows activity patterns across different days and hours. 
-                        Darker blue indicates higher activity levels.
+                        This visualization compares how strongly temperature and activity are correlated in male and female mice. 
+                        Bar height represents correlation strength (higher = stronger relationship).
                     </p>
                 </div>
             </div>
@@ -156,10 +157,6 @@
             </p>
         </section>
     </main>
-
-    <footer>
-        <p>DSC 106 Final Project - Data Visualization</p>
-    </footer>
 
     <script src="main.js"></script>
 </body>

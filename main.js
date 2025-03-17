@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('gender-select').addEventListener('change', function() {
         selectedGender = this.value;
         
-        // Update mouse select options based on gender (call the same function)
+        // Update mouse select options based on gender
         initializeMouseDropdown();
         
         updateVisualizations();
@@ -83,12 +83,31 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log(`Male Activity: ${maleActData.length} rows`);
         console.log(`Male Temperature: ${maleTempData.length} rows`);
         
+        // Debug check for male data - verify the structure and content
+        if (maleActData && maleActData.length > 0) {
+            console.log("Sample male activity data (first row):", maleActData[0]);
+            console.log("Available male activity columns:", Object.keys(maleActData[0]));
+        } else {
+            console.error("Male activity data is empty or undefined!");
+        }
+        
+        if (maleTempData && maleTempData.length > 0) {
+            console.log("Sample male temperature data (first row):", maleTempData[0]);
+            console.log("Available male temperature columns:", Object.keys(maleTempData[0]));
+        } else {
+            console.error("Male temperature data is empty or undefined!");
+        }
+        
         // Initialize mouse dropdown based on default gender (female)
         initializeMouseDropdown();
         
         // Initialize visualizations
         initializeVisualizations();
-    })
+    }).catch(function(error) {
+        // Add error handling for data loading
+        console.error("Error loading data files:", error);
+        alert("Error loading data. Please check console for details.");
+    });
 });
 
 // Initialize all visualizations
@@ -128,14 +147,25 @@ function getFilteredData() {
     let actData = [];
     let tempData = [];
     
-    // Filter by gender
+    // Filter by gender and verify data exists
     if (selectedGender === 'female') {
-        actData = actData.concat(femActData);
-        tempData = tempData.concat(femTempData);
+        if (!femActData || !femTempData) {
+            console.error("Female data not available");
+            return { actData: [], tempData: [] };
+        }
+        actData = [...femActData]; // Use spread operator to create a copy
+        tempData = [...femTempData];
     } else {
-        actData = actData.concat(maleActData);
-        tempData = tempData.concat(maleTempData);
+        if (!maleActData || !maleTempData) {
+            console.error("Male data not available");
+            return { actData: [], tempData: [] };
+        }
+        actData = [...maleActData]; // Use spread operator to create a copy
+        tempData = [...maleTempData];
     }
+    
+    // Add debug information
+    console.log(`getFilteredData: ${selectedGender} data, actData length: ${actData.length}, tempData length: ${tempData.length}`);
     
     // Filter by time period
     let periodInMinutes;
@@ -151,6 +181,17 @@ function getFilteredData() {
             break;
         default:
             periodInMinutes = MINUTES_PER_DAY;
+    }
+    
+    // Check if we have enough data for the selected period
+    if (actData.length < periodInMinutes) {
+        console.warn(`Not enough activity data for selected period. Requested: ${periodInMinutes}, Available: ${actData.length}`);
+        periodInMinutes = Math.min(periodInMinutes, actData.length);
+    }
+    
+    if (tempData.length < periodInMinutes) {
+        console.warn(`Not enough temperature data for selected period. Requested: ${periodInMinutes}, Available: ${tempData.length}`);
+        periodInMinutes = Math.min(periodInMinutes, tempData.length);
     }
     
     actData = actData.slice(0, periodInMinutes);
@@ -207,6 +248,24 @@ function calculateHourlyAverages(data, mouseIds) {
 // Create time series chart showing temperature and activity over time
 function createTimeSeriesChart() {
     const { actData, tempData } = getFilteredData();
+    
+    // Check if we have data to display
+    if (!actData || actData.length === 0 || !tempData || tempData.length === 0) {
+        console.error("No data available for time series chart");
+        
+        // Display an error message in the chart container
+        const container = document.getElementById('time-series-chart');
+        d3.select(container)
+            .append('div')
+            .attr('class', 'error-message')
+            .style('color', 'red')
+            .style('padding', '20px')
+            .style('text-align', 'center')
+            .html('No data available for the selected options.');
+            
+        return;
+    }
+    
     const mouseIds = getMouseIds();
     
     // Container dimensions
@@ -227,6 +286,23 @@ function createTimeSeriesChart() {
     const chart = svg.append('g')
         .attr('transform', `translate(${margin.left}, ${margin.top})`);
     
+    // Create tooltip div if it doesn't exist
+    let tooltip = d3.select('body').select('.tooltip');
+    if (tooltip.empty()) {
+        tooltip = d3.select('body')
+            .append('div')
+            .attr('class', 'tooltip')
+            .style('opacity', 0)
+            .style('position', 'absolute')
+            .style('background-color', 'rgba(0, 0, 0, 0.8)')
+            .style('color', 'white')
+            .style('border-radius', '4px')
+            .style('padding', '10px')
+            .style('font-size', '12px')
+            .style('pointer-events', 'none')
+            .style('z-index', 1000);
+    }
+
     // Prepare data for visualization
     const combinedData = [];
     
@@ -236,15 +312,20 @@ function createTimeSeriesChart() {
             const actRow = actData[i];
             const tempRow = tempData[i];
             
+            if (!actRow || !tempRow) {
+                console.warn(`Missing data at index ${i}`);
+                continue;
+            }
+            
             // Calculate average activity and temperature across all applicable mice
             let sumAct = 0, sumTemp = 0, countAct = 0, countTemp = 0;
             
             mouseIds.forEach(id => {
-                if (!isNaN(actRow[id])) {
+                if (actRow[id] !== undefined && !isNaN(actRow[id])) {
                     sumAct += actRow[id];
                     countAct++;
                 }
-                if (!isNaN(tempRow[id])) {
+                if (tempRow[id] !== undefined && !isNaN(tempRow[id])) {
                     sumTemp += tempRow[id];
                     countTemp++;
                 }
@@ -265,12 +346,36 @@ function createTimeSeriesChart() {
             const actRow = actData[i];
             const tempRow = tempData[i];
             
+            if (!actRow || !tempRow) {
+                console.warn(`Missing data at index ${i}`);
+                continue;
+            }
+            
+            const activity = actRow[selectedMouse];
+            const temperature = tempRow[selectedMouse];
+            
             combinedData.push({
                 minute: i,
-                activity: actRow[selectedMouse] || 0,
-                temperature: tempRow[selectedMouse] || 0
+                activity: activity !== undefined && !isNaN(activity) ? activity : 0,
+                temperature: temperature !== undefined && !isNaN(temperature) ? temperature : 0
             });
         }
+    }
+    
+    // Check if we have any valid data points after processing
+    if (combinedData.length === 0) {
+        console.error("No valid data points for time series chart");
+        
+        // Display an error message in the chart container
+        d3.select(container)
+            .append('div')
+            .attr('class', 'error-message')
+            .style('color', 'red')
+            .style('padding', '20px')
+            .style('text-align', 'center')
+            .html('No valid data points for the selected options.');
+            
+        return;
     }
     
     // Create scales
@@ -332,6 +437,68 @@ function createTimeSeriesChart() {
         .attr('class', 'line-act')
         .attr('d', actLine);
     
+    // Add invisible tooltip capture rectangles
+    const tooltipWidth = chartWidth / combinedData.length;
+    chart.selectAll('.tooltip-area')
+        .data(combinedData)
+        .enter()
+        .append('rect')
+        .attr('class', 'tooltip-area')
+        .attr('x', (d, i) => xScale(i) - tooltipWidth/2)
+        .attr('y', 0)
+        .attr('width', tooltipWidth)
+        .attr('height', chartHeight)
+        .attr('fill', 'transparent')
+        .attr('cursor', 'pointer')
+        .on('mouseover', function(event, d) {
+            // Format time for display
+            const minutes = d.minute;
+            const hours = Math.floor(minutes / 60) % 24;
+            const days = Math.floor(minutes / (24 * 60)) + 1;
+            const timeDisplay = selectedPeriod === '24h' 
+                ? `${hours}:${(minutes % 60).toString().padStart(2, '0')}`
+                : `Day ${days}, ${hours}:${(minutes % 60).toString().padStart(2, '0')}`;
+            
+            // Show tooltip with data
+            tooltip.transition()
+                .duration(200)
+                .style('opacity', 0.9);
+            
+            tooltip.html(`
+                <strong>Time:</strong> ${timeDisplay}<br>
+                <strong>Temperature:</strong> ${d.temperature.toFixed(2)} °C<br>
+                <strong>Activity:</strong> ${d.activity.toFixed(2)}
+            `)
+                .style('left', `${event.pageX + 15}px`)
+                .style('top', `${event.pageY - 28}px`);
+                
+            // Add highlight circles at the current data point
+            chart.append('circle')
+                .attr('class', 'highlight-temp')
+                .attr('cx', xScale(d.minute))
+                .attr('cy', yScaleTemp(d.temperature))
+                .attr('r', 5)
+                .attr('fill', COLORS.temp)
+                .attr('stroke', 'white');
+                
+            chart.append('circle')
+                .attr('class', 'highlight-act')
+                .attr('cx', xScale(d.minute))
+                .attr('cy', yScaleAct(d.activity))
+                .attr('r', 5)
+                .attr('fill', COLORS.act)
+                .attr('stroke', 'white');
+        })
+        .on('mouseout', function() {
+            // Hide tooltip
+            tooltip.transition()
+                .duration(500)
+                .style('opacity', 0);
+                
+            // Remove highlight circles
+            chart.selectAll('.highlight-temp, .highlight-act').remove();
+        });
+
     // Create axes
     const xAxis = d3.axisBottom(xScale)
         .ticks(10)
@@ -436,7 +603,6 @@ function createTimeSeriesChart() {
         .text(`${mouseLabel} - ${genderLabel}`);
 }
 
-// Create scatter plot to show correlation between temperature and activity
 // Create scatter plot to show correlation between temperature and activity
 function createScatterPlot() {
     const { actData, tempData } = getFilteredData();
@@ -798,6 +964,23 @@ function createDailyActivityChart() {
             activity: hourValues.length > 0 ? d3.mean(hourValues) : 0
         };
     });
+
+    // Create tooltip div if it doesn't exist
+    let tooltip = d3.select('body').select('.tooltip');
+    if (tooltip.empty()) {
+        tooltip = d3.select('body')
+            .append('div')
+            .attr('class', 'tooltip')
+            .style('opacity', 0)
+            .style('position', 'absolute')
+            .style('background-color', 'rgba(0, 0, 0, 0.8)')
+            .style('color', 'white')
+            .style('border-radius', '4px')
+            .style('padding', '10px')
+            .style('font-size', '12px')
+            .style('pointer-events', 'none')
+            .style('z-index', 1000);
+    }
     
     // Create scales
     const xScale = d3.scaleLinear()
@@ -830,6 +1013,56 @@ function createDailyActivityChart() {
         .datum(avgDailyData)
         .attr('class', 'line-act')
         .attr('d', activityLine);
+
+    // Make sure to remove any existing .point elements before adding new ones
+    chart.selectAll('.point').remove();
+    
+    // Add points with tooltip functionality
+    chart.selectAll('.point')
+        .data(avgDailyData)
+        .enter()
+        .append('circle')
+        .attr('class', 'point')
+        .attr('cx', d => xScale(d.hour))
+        .attr('cy', d => yScale(d.activity))
+        .attr('r', 4)
+        .attr('fill', COLORS.act)
+        .on('mouseover', function(event, d) {
+            // Enlarge the point on hover
+            d3.select(this)
+                .transition()
+                .duration(100)
+                .attr('r', 7);
+            
+            // Show tooltip with formatted time
+            tooltip.transition()
+                .duration(200)
+                .style('opacity', 0.9);
+            
+            const hourFormatted = d.hour.toString().padStart(2, '0');
+            
+            tooltip.html(`
+                <strong>Time:</strong> ${hourFormatted}:00<br>
+                <strong>Activity:</strong> ${d.activity.toFixed(2)}<br>
+                ${d.activity > overallAvg ? 
+                  `<span style="color: #8AFF8A">Above average</span>` : 
+                  `<span style="color: #FF8A8A">Below average</span>`}
+            `)
+                .style('left', `${event.pageX + 10}px`)
+                .style('top', `${event.pageY - 15}px`);
+        })
+        .on('mouseout', function() {
+            // Return to original size
+            d3.select(this)
+                .transition()
+                .duration(100)
+                .attr('r', 4);
+            
+            // Hide tooltip
+            tooltip.transition()
+                .duration(500)
+                .style('opacity', 0);
+        });
     
     // Add points
     chart.selectAll('.point')
@@ -973,6 +1206,23 @@ function createDailyTempChart() {
     
     // Calculate hourly averages
     const hourlyData = calculateHourlyAverages(tempData, mouseIds);
+
+    // Create tooltip div if it doesn't exist
+    let tooltip = d3.select('body').select('.tooltip');
+    if (tooltip.empty()) {
+        tooltip = d3.select('body')
+            .append('div')
+            .attr('class', 'tooltip')
+            .style('opacity', 0)
+            .style('position', 'absolute')
+            .style('background-color', 'rgba(0, 0, 0, 0.8)')
+            .style('color', 'white')
+            .style('border-radius', '4px')
+            .style('padding', '10px')
+            .style('font-size', '12px')
+            .style('pointer-events', 'none')
+            .style('z-index', 1000);
+    }
     
     // Use a different array for days in the dataset
     const dayCount = Math.floor(tempData.length / (24 * 60));
@@ -1040,6 +1290,56 @@ function createDailyTempChart() {
         .datum(avgDailyData)
         .attr('class', 'line-temp')
         .attr('d', temperatureLine);
+
+    // Make sure to remove any existing .point elements before adding new ones
+    chart.selectAll('.point').remove();
+    
+    // Add points with tooltip functionality
+    chart.selectAll('.point')
+        .data(avgDailyData)
+        .enter()
+        .append('circle')
+        .attr('class', 'point')
+        .attr('cx', d => xScale(d.hour))
+        .attr('cy', d => yScale(d.temperature))
+        .attr('r', 4)
+        .attr('fill', COLORS.temp)
+        .on('mouseover', function(event, d) {
+            // Enlarge the point on hover
+            d3.select(this)
+                .transition()
+                .duration(100)
+                .attr('r', 7);
+            
+            // Show tooltip with formatted time
+            tooltip.transition()
+                .duration(200)
+                .style('opacity', 0.9);
+            
+            const hourFormatted = d.hour.toString().padStart(2, '0');
+            
+            tooltip.html(`
+                <strong>Time:</strong> ${hourFormatted}:00<br>
+                <strong>Temperature:</strong> ${d.temperature.toFixed(2)} °C<br>
+                ${d.temperature > overallAvg ? 
+                  `<span style="color: #FF8A8A">Above average</span>` : 
+                  `<span style="color: #8AFF8A">Below average</span>`}
+            `)
+                .style('left', `${event.pageX + 10}px`)
+                .style('top', `${event.pageY - 15}px`);
+        })
+        .on('mouseout', function() {
+            // Return to original size
+            d3.select(this)
+                .transition()
+                .duration(100)
+                .attr('r', 4);
+            
+            // Hide tooltip
+            tooltip.transition()
+                .duration(500)
+                .style('opacity', 0);
+        });
     
     // Add points
     chart.selectAll('.point')
@@ -1575,6 +1875,9 @@ function createActivityHeatmap() {
 function initializeMouseDropdown() {
     const mouseSelect = document.getElementById('mouse-select');
     
+    // Store the current selection before modifying the dropdown
+    const currentSelection = mouseSelect.value;
+    
     // Clear existing options except 'average'
     while (mouseSelect.options.length > 1) {
         mouseSelect.remove(1);
@@ -1593,10 +1896,71 @@ function initializeMouseDropdown() {
         mouseSelect.add(option);
     });
     
-    // Set dropdown to "average" by default
-    mouseSelect.value = 'average';
+    // Try to set the dropdown to a matching selection in the new gender,
+    // or set to "average" if no appropriate match exists
+    if (currentSelection !== 'average') {
+        // If we switched from female to male or vice versa,
+        // try to select the same index mouse in the new gender
+        if (currentSelection.startsWith('f') && selectedGender === 'male') {
+            // Convert f1 -> m1, f2 -> m2, etc.
+            const index = currentSelection.substring(1);
+            const newSelection = 'm' + index;
+            
+            // Check if this mouse exists in the options
+            let found = false;
+            for (let i = 0; i < mouseSelect.options.length; i++) {
+                if (mouseSelect.options[i].value === newSelection) {
+                    mouseSelect.value = newSelection;
+                    found = true;
+                    break;
+                }
+            }
+            
+            if (!found) {
+                mouseSelect.value = 'average';
+            }
+        } 
+        else if (currentSelection.startsWith('m') && selectedGender === 'female') {
+            // Convert m1 -> f1, m2 -> f2, etc.
+            const index = currentSelection.substring(1);
+            const newSelection = 'f' + index;
+            
+            // Check if this mouse exists in the options
+            let found = false;
+            for (let i = 0; i < mouseSelect.options.length; i++) {
+                if (mouseSelect.options[i].value === newSelection) {
+                    mouseSelect.value = newSelection;
+                    found = true;
+                    break;
+                }
+            }
+            
+            if (!found) {
+                mouseSelect.value = 'average';
+            }
+        }
+        else {
+            // If we're not changing gender, try to keep the same selection
+            let found = false;
+            for (let i = 0; i < mouseSelect.options.length; i++) {
+                if (mouseSelect.options[i].value === currentSelection) {
+                    mouseSelect.value = currentSelection;
+                    found = true;
+                    break;
+                }
+            }
+            
+            if (!found) {
+                mouseSelect.value = 'average';
+            }
+        }
+    } else {
+        mouseSelect.value = 'average';
+    }
+    
+    // Update the selectedMouse variable to match the new selection
+    selectedMouse = mouseSelect.value;
 }
-
 // Update summary text with key findings
 function updateSummaryText() {
     // Calculate correlations based on current selection
