@@ -43,9 +43,10 @@
         </section>
 
         <section class="visualization-container">
+            <h3>Settings</h3>
             <div class="controls">
                 <div class="control-group">
-                    <label for="gender-select">Select Gender:</label>
+                    <label for="gender-select">Gender:</label>
                     <select id="gender-select">
                         <option value="female">Female</option>
                         <option value="male">Male</option>
@@ -98,8 +99,19 @@
                     <h3>Temperature & Activity Over Time</h3>
                     <div id="time-series-chart" class="chart-container"></div>
                     <p class="chart-description">
-                        This visualization shows how temperature (red) and activity (blue) change over time. 
-                        Notice the cyclical patterns and how temperature and activity often peak and decline together.
+                        This visualization depicts how <span class="red-bold">temperature</span> and <span class="blue-bold">activity</span> 
+                        changes over time across different <b>settings that you can change above &uarr;</b>. What do you notice?
+                        <br>
+                        <br>
+                        Notice the cyclical patterns and how temperature and activity often <b>peak and decline together</b>; both variables display
+                        similar trends across different combinations of gender, time period and mouse ID. Regardless of these factors, 
+                        the graph reveals a consistent pattern: activity and temperature <b>peak during the first 12 hours</b> (the dark phase, 
+                        when mice are naturally more active) and gradually <b>decline during the following 12 hours</b> (the light phase, associated
+                        with rest and lower activity). 
+                        <br>
+                        <br>
+                        This cyclical pattern reveals that <b>core body temperature and physical activity are tightly
+                        synchronized with the light-dark cycle</b>, with both metrics rising and falling in tandem over each 24-hour period. 
                     </p>
                 </div>
             </div>
@@ -109,8 +121,19 @@
                     <h3>Correlation Between Temperature and Activity</h3>
                     <div id="scatter-plot" class="chart-container"></div>
                     <p class="chart-description">
-                        Each point represents a moment in time. Points that form a trend from bottom-left to top-right 
-                        indicate a positive correlation: as temperature increases, so does activity.
+                        This scatterplot depicts individual activity recordings on a case-by-case basis, highlighting the correlation between 
+                        core body temperature and activity levels.
+                        <br>
+                        <br>
+                        In general, temperature (x-axis) is <b>positively correlated</b> with activity level (y-axis) for both male and female mice. 
+                        However, the quantified correlation is only moderately strong, with the Pearson correlation coefficient ranging from <b>0.3 to 0.79</b>, 
+                        depending on the characteristics being analyzed (e.g., individual mice vs. averages, male vs. female).
+                        <br>
+                        <br>
+                        <b>Why isn’t the correlation stronger?</b> A closer look reveals a higher density of points along the x-axis at an activity level of 0, 
+                        indicating periods when the mice are likely sleeping. This pattern is further supported by the timestamps visible in the tooltips 
+                        of the 24-hour scatterplot, aligning with the resting phase. Interestingly, the variance in temperature during these inactive periods
+                        tends to be higher compared to when the mice are active, which contributes to the moderate correlation observed.
                     </p>
                 </div>
             </div>
@@ -148,11 +171,11 @@
 
         <section class="key-findings">
             <h2>Key Findings</h2>
-            <div id="correlation-summary"></div>
+            <div id="correlation-summary"></div>          
         </section>
 
         <section class="conclusion">
-            <h2>Conclusion</h2>
+            <h2>Takeaways</h2>
             <p id="conclusion-text">
                 Based on our analysis of mice temperature and activity data, we can draw several conclusions about the relationship 
                 between these variables and how they differ between genders. Our findings will be dynamically updated based on the 
@@ -164,3 +187,4 @@
     <script src="main.js"></script>
 </body>
 </html>
+

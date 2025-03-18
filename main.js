@@ -1845,18 +1845,10 @@ function updateSummaryText() {
     
     // Update correlation summary
     document.getElementById('correlation-summary').innerHTML = `
-        <h3>Temperature-Activity Correlation</h3>
         <p>
-            The data shows a <strong>${avgFemaleCorrelation > 0.5 ? 'strong' : avgFemaleCorrelation > 0.3 ? 'moderate' : 'weak'} positive correlation</strong> between body temperature and activity level in female mice (r = ${avgFemaleCorrelation.toFixed(3)}) and a
-            <strong>${avgMaleCorrelation > 0.5 ? 'strong' : avgMaleCorrelation > 0.3 ? 'moderate' : 'weak'} positive correlation</strong> in male mice (r = ${avgMaleCorrelation.toFixed(3)}).
-            ${avgFemaleCorrelation > avgMaleCorrelation ? 
-            'Female mice show a stronger correlation between temperature and activity compared to males.' : 
-            'Male mice show a stronger correlation between temperature and activity compared to females.'}
-        </p>
-        <p>
-            This suggests that ${avgFemaleCorrelation > 0.5 || avgMaleCorrelation > 0.5 ? 
-            'hotter mice do tend to move more, with body temperature rising as activity increases.' : 
-            'the relationship between body temperature and activity is not as strong as hypothesized, though there is some positive correlation.'}
+            1. hello
+            <br>
+            2. hello
         </p>
     `;
     
