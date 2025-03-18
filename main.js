@@ -1873,7 +1873,16 @@ function updateSummaryText() {
     // Update correlation summary
     document.getElementById('white-box').innerHTML = `
         <p>
-            testing.
+            These two time-series line plots show temperature and activity levels side by side in a 24-hour window, along with the average 
+            activity and temperature. The most obvious takeaway from these two graphs is how similar they look. Ignoring the scales and axes,
+            the lines in both graphs tend to follow a nearly identical path, peaking in the first two hours and then dropping below their 
+            respective averages at around 10 hours. If you only saw these two graphs, you would immediately conclude that temperature and 
+            activity are almost perfectly correlated with each other. When looking at differences in gender, we can see that while male mice 
+            are generally more active than female mice (average activity of 26.0 vs 22.6 respectively), the average temperature of male mice is 
+            lower than that of female mice, at 36.65 vs 37.26 respectively. Why is this? The answer might be estrus: A temporary condition that 
+            female mice undergo every four days, leading to increased body temperature, especially during “lights-on” periods. Because estrus 
+            leads to increased body temperature but not increased activity, it might be the answer to why the variance of temperature is so high 
+            for inactive mice, as shown in the scatterplot, and thus why temperature and activity are only moderately correlated.
         </p>
     `;
 
