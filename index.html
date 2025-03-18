@@ -21,24 +21,24 @@
         <section class="introduction">
             <h2>Introduction</h2>
             <p>
-                <b>Do hotter mice move more?</b> Temperature fluctuations in mammals often correlate with changes in energy expenditure 
+                <b>Do hotter mice move more?</b> Body temperature fluctuations in mammals often correlate with changes in energy expenditure 
                 and activity patterns, but how this relationship plays out in a tightly controlled environment, such as that of laboratory mice,
-                fuels the motivation for the project. This interactive dashboard <b>explores relationship between body temperature and physical activity 
-                in mice</b>, specicifally examining how changes in core body temperature influence minute-level activity patterns over a 14-day period.
-                By analyzing both male and female mice under a consistent 12-hour light/dark cycle, the project highlights differences in activity 
-                across light phases and investigates the impact of estrus in females, where increased temperature and activity may reveal unique 
-                behavioral patterns.
+                fuels the motivation for the project. This interactive dashboard <b>explores relationship between body temperature and activity level
+                in mice</b>, specicifally examining how changes in body temperature influence minute-level activity level patterns over a 14-day period.
+                By analyzing both male and female mice under a consistent 12-hour light/dark cycle, this study highlights differences in activity 
+                across different time periods and investigates the impact of estrus in females, where increased body temperature and activity level may reveal 
+                unique behavioral patterns.
             </p>
         </section>
 
         <section class="introduction">
             <h2>Dataset Overview</h2>
             <p>
-                The dataset used in this project contains minute-level data on activity and core body temperature for both male and female mice 
+                The dataset used in this project contains minute-level data on activity level as well as core body temperature for both male and female mice 
                 over a 14-day period. The lighting follows a 12-hour on, 12-hour off controlled square wave, aligning daily rhythms with a 
                 consistent light-dark cycle. Mice, being nocturnal, exhibit peak activity during the dark phase. Notably, female mice experience 
                 estrus every 4 days, a period linked to ovulation and characterized by longer, hotter, and more active intervals. 
-                The data records the activity and body temperature of individual mice (unique IDs) for each minute.
+                The data records the activity level and body temperature of individual mice (unique IDs) for each minute.
             </p>
         </section>
 
@@ -103,9 +103,9 @@
                         changes over time across different <b>settings that you can change above &uarr;</b>. What do you notice?
                         <br>
                         <br>
-                        Notice the cyclical patterns and how temperature and activity often <b>peak and decline together</b>; both variables display
+                        Notice the cyclical patterns and how body temperature and activity level often <b>peak and decline together</b>; both variables display
                         similar trends across different combinations of gender, time period and mouse ID. Regardless of these factors, 
-                        the graph reveals a consistent pattern: activity and temperature <b>peak during the first 12 hours</b> (the dark phase, 
+                        the graph reveals a consistent pattern: activity level and body temperature <b>peak during the first 12 hours</b> (the dark phase, 
                         when mice are naturally more active) and gradually <b>decline during the following 12 hours</b> (the light phase, associated
                         with rest and lower activity). 
                         <br>
@@ -121,8 +121,8 @@
                     <h3>Correlation Between Temperature and Activity</h3>
                     <div id="scatter-plot" class="chart-container"></div>
                     <p class="chart-description">
-                        This scatterplot depicts individual activity recordings on a case-by-case basis, highlighting the correlation between 
-                        core body temperature and activity levels.
+                        This scatterplot depicts activity level and body temperature on a case-by-case basis across different mouse ID and gender 
+                        (<b>settings that you can change above &uarr;</b>), highlighting the correlation between core body temperature and activity levels.
                         <br>
                         <br>
                         In general, temperature (x-axis) is <b>positively correlated</b> with activity level (y-axis) for both male and female mice. 
@@ -132,7 +132,7 @@
                         <br>
                         <b>Why isn’t the correlation stronger?</b> A closer look reveals a higher density of points along the x-axis at an activity level of 0, 
                         indicating periods when the mice are likely sleeping. This pattern is further supported by the timestamps visible in the tooltips 
-                        of the 24-hour scatterplot, aligning with the resting phase. Interestingly, the variance in temperature during these inactive periods
+                        of the 24-hour scatterplot, aligning with the resting phase. Interestingly, the variance in body temperature during these inactive periods
                         tends to be higher compared to when the mice are active, which contributes to the moderate correlation observed.
                     </p>
                 </div>
@@ -180,6 +180,13 @@
                 Based on our analysis of mice temperature and activity data, we can draw several conclusions about the relationship 
                 between these variables and how they differ between genders. Our findings will be dynamically updated based on the 
                 interactive visualizations above.
+            </p>
+        </section>
+
+        <section class="introduction">
+            <h2>Project Demo Video</h2>
+            <p>
+                <iframe width="560" height="315" src="https://www.youtube.com/embed/wa41KVIVlSY" frameborder="0" allowfullscreen></iframe>
             </p>
         </section>
     </main>

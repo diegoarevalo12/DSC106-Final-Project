@@ -1873,9 +1873,11 @@ function updateSummaryText() {
     // Update correlation summary
     document.getElementById('correlation-summary').innerHTML = `
         <p>
-            1. hello
+            1. <b>Positive Correlation:</b> Body temperature is positively correlated with activity level for both male and female mice.
             <br>
-            2. hello
+            2. <b>Cyclical Pattern:</b> Body temperature and activity level are tightly synchronized with the light-dark cycle, rising and falling in tandem over each 24-hour period.
+            <br>
+            3. <b>Estrus Effect:</b> Females in estrus show slightly different patterns of activity and temperature, with increased activity level and  body temperature during ovulation days.
         </p>
     `;
     
