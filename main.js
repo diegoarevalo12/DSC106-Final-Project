@@ -1871,6 +1871,13 @@ function updateSummaryText() {
     const avgMaleCorrelation = d3.mean(maleCorrelations, d => d.correlation);
     
     // Update correlation summary
+    document.getElementById('white-box').innerHTML = `
+        <p>
+            testing.
+        </p>
+    `;
+
+    // Update correlation summary
     document.getElementById('correlation-summary').innerHTML = `
         <p>
             1. <b>Positive Correlation:</b> Body temperature is positively correlated with activity level for both male and female mice.
