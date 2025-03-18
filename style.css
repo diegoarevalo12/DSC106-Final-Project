@@ -202,3 +202,13 @@ footer {
         font-size: 1.5rem;
     }
 }
+
+.red-bold {
+    font-weight: bold;
+    color: red;
+}
+
+.blue-bold {
+    font-weight: bold;
+    color: blue;
+}

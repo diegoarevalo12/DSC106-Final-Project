@@ -300,7 +300,7 @@ function createTimeSeriesChart() {
             .style('pointer-events', 'none')
             .style('z-index', 1000);
     }
-
+    
     // Prepare data for visualization
     const combinedData = [];
     
@@ -435,93 +435,58 @@ function createTimeSeriesChart() {
         .attr('class', 'line-act')
         .attr('d', actLine);
     
-    // Add invisible tooltip capture rectangles
-    const tooltipWidth = chartWidth / combinedData.length;
-    chart.selectAll('.tooltip-area')
-        .data(combinedData)
-        .enter()
-        .append('rect')
-        .attr('class', 'tooltip-area')
-        .attr('x', (d, i) => xScale(i) - tooltipWidth/2)
-        .attr('y', 0)
-        .attr('width', tooltipWidth)
-        .attr('height', chartHeight)
-        .attr('fill', 'transparent')
-        .attr('cursor', 'pointer')
-        .on('mouseover', function(event, d) {
-            // Format time for display
-            const minutes = d.minute;
-            const hours = Math.floor(minutes / 60) % 24;
-            const days = Math.floor(minutes / (24 * 60)) + 1;
-            const timeDisplay = selectedPeriod === '24h' 
-                ? `${hours}:${(minutes % 60).toString().padStart(2, '0')}`
-                : `Day ${days}, ${hours}:${(minutes % 60).toString().padStart(2, '0')}`;
-            
-            // Show tooltip with data
-            tooltip.transition()
-                .duration(200)
-                .style('opacity', 0.9);
-            
-            tooltip.html(`
-                <strong>Time:</strong> ${timeDisplay}<br>
-                <strong>Temperature:</strong> ${d.temperature.toFixed(2)} °C<br>
-                <strong>Activity:</strong> ${d.activity.toFixed(2)}
-            `)
-                .style('left', `${event.pageX + 15}px`)
-                .style('top', `${event.pageY - 28}px`);
-                
-            // Add highlight circles at the current data point
-            chart.append('circle')
-                .attr('class', 'highlight-temp')
-                .attr('cx', xScale(d.minute))
-                .attr('cy', yScaleTemp(d.temperature))
-                .attr('r', 5)
-                .attr('fill', COLORS.temp)
-                .attr('stroke', 'white');
-                
-            chart.append('circle')
-                .attr('class', 'highlight-act')
-                .attr('cx', xScale(d.minute))
-                .attr('cy', yScaleAct(d.activity))
-                .attr('r', 5)
-                .attr('fill', COLORS.act)
-                .attr('stroke', 'white');
-        })
-        .on('mouseout', function() {
-            // Hide tooltip
-            tooltip.transition()
-                .duration(500)
-                .style('opacity', 0);
-                
-            // Remove highlight circles
-            chart.selectAll('.highlight-temp, .highlight-act').remove();
-        });
-
-    // Create axes
-    const xAxis = d3.axisBottom(xScale)
-        .ticks(10)
-        .tickFormat(d => {
-            const hours = Math.floor(d / 60) % 24;
-            const days = Math.floor(d / 1440) + 1;
-            return selectedPeriod === '24h' ? `${hours}h` : `Day ${days}`;
-        });
+    // Create x-axis with proper tick formatting
+    const xAxis = d3.axisBottom(xScale);
     
+    // Format the ticks differently based on the selected time period
+    if (selectedPeriod === '24h') {
+        // For 24-hour view, show hour marks (0h, 4h, 8h, etc.)
+        xAxis.ticks(12)
+            .tickFormat(d => {
+                const hours = Math.floor(d / 60);
+                return `${hours}h`;
+            });
+    } else if (selectedPeriod === '7d') {
+        // For 7-day view, show one tick per day
+        const dayWidth = MINUTES_PER_DAY;
+        const dayTicks = [];
+        for (let i = 0; i < 7; i++) {
+            dayTicks.push(i * dayWidth);
+        }
+        xAxis.tickValues(dayTicks)
+            .tickFormat(d => {
+                const days = Math.floor(d / MINUTES_PER_DAY) + 1;
+                return `Day ${days}`;
+            });
+    } else if (selectedPeriod === '14d') {
+        // For 14-day view, show one tick every other day
+        const dayWidth = MINUTES_PER_DAY;
+        const dayTicks = [];
+        for (let i = 0; i < 14; i += 2) {
+            dayTicks.push(i * dayWidth);
+        }
+        xAxis.tickValues(dayTicks)
+            .tickFormat(d => {
+                const days = Math.floor(d / MINUTES_PER_DAY) + 1;
+                return `Day ${days}`;
+            });
+    }
+    
+    // Create y-axes
     const yAxisTemp = d3.axisLeft(yScaleTemp)
         .ticks(5);
     
     const yAxisAct = d3.axisRight(yScaleAct)
         .ticks(5);
     
-    // Add axes to chart
+    // Add all axes to the chart
     chart.append('g')
         .attr('class', 'x-axis')
         .attr('transform', `translate(0, ${chartHeight})`)
         .call(xAxis)
         .selectAll('text')
-        .style('text-anchor', 'end')
-        .attr('dx', '-.8em')
-        .attr('dy', '.15em')
-        .attr('transform', 'rotate(-45)');
+        .style('text-anchor', 'middle')
+        .attr('dy', '1em');
     
     chart.append('g')
         .attr('class', 'y-axis-temp')
@@ -599,6 +564,68 @@ function createTimeSeriesChart() {
         .attr('text-anchor', 'middle')
         .style('font-weight', 'bold')
         .text(`${mouseLabel} - ${genderLabel}`);
+    
+    // Add tooltip capture rectangles
+    const tooltipWidth = chartWidth / combinedData.length;
+    chart.selectAll('.tooltip-area')
+        .data(combinedData)
+        .enter()
+        .append('rect')
+        .attr('class', 'tooltip-area')
+        .attr('x', (d, i) => xScale(i) - tooltipWidth/2)
+        .attr('y', 0)
+        .attr('width', tooltipWidth)
+        .attr('height', chartHeight)
+        .attr('fill', 'transparent')
+        .attr('cursor', 'pointer')
+        .on('mouseover', function(event, d) {
+            // Format time for display
+            const minutes = d.minute;
+            const hours = Math.floor(minutes / 60) % 24;
+            const days = Math.floor(minutes / (24 * 60)) + 1;
+            const timeDisplay = selectedPeriod === '24h' 
+                ? `${hours}:${(minutes % 60).toString().padStart(2, '0')}`
+                : `Day ${days}, ${hours}:${(minutes % 60).toString().padStart(2, '0')}`;
+            
+            // Show tooltip with data
+            tooltip.transition()
+                .duration(200)
+                .style('opacity', 0.9);
+            
+            tooltip.html(`
+                <strong>Time:</strong> ${timeDisplay}<br>
+                <strong>Temperature:</strong> ${d.temperature.toFixed(2)} °C<br>
+                <strong>Activity:</strong> ${d.activity.toFixed(2)}
+            `)
+                .style('left', `${event.pageX + 15}px`)
+                .style('top', `${event.pageY - 28}px`);
+                
+            // Add highlight circles at the current data point
+            chart.append('circle')
+                .attr('class', 'highlight-temp')
+                .attr('cx', xScale(d.minute))
+                .attr('cy', yScaleTemp(d.temperature))
+                .attr('r', 5)
+                .attr('fill', COLORS.temp)
+                .attr('stroke', 'white');
+                
+            chart.append('circle')
+                .attr('class', 'highlight-act')
+                .attr('cx', xScale(d.minute))
+                .attr('cy', yScaleAct(d.activity))
+                .attr('r', 5)
+                .attr('fill', COLORS.act)
+                .attr('stroke', 'white');
+        })
+        .on('mouseout', function() {
+            // Hide tooltip
+            tooltip.transition()
+                .duration(500)
+                .style('opacity', 0);
+                
+            // Remove highlight circles
+            chart.selectAll('.highlight-temp, .highlight-act').remove();
+        });
 }
 
 // Create scatter plot to show correlation between temperature and activity
@@ -805,17 +832,6 @@ function createScatterPlot() {
         const regressionLine = d3.line()
             .x(d => d)
             .y(d => slope * d + intercept);
-        
-        // Draw the regression line
-        const xDomain = xScale.domain();
-        chart.append('path')
-            .datum([xDomain[0], xDomain[1]])
-            .attr('class', 'regression-line')
-            .attr('d', regressionLine.x(d => xScale(d)))
-            .attr('stroke', '#222')
-            .attr('stroke-width', 2)
-            .attr('stroke-dasharray', '5,5')
-            .attr('fill', 'none');
         
         // Add correlation text
         chart.append('text')
@@ -1855,19 +1871,20 @@ function updateSummaryText() {
     const avgMaleCorrelation = d3.mean(maleCorrelations, d => d.correlation);
     
     // Update correlation summary
-    document.getElementById('correlation-summary').innerHTML = `
-        <h3>Temperature-Activity Correlation</h3>
+    document.getElementById('white-box').innerHTML = `
         <p>
-            The data shows a <strong>${avgFemaleCorrelation > 0.5 ? 'strong' : avgFemaleCorrelation > 0.3 ? 'moderate' : 'weak'} positive correlation</strong> between body temperature and activity level in female mice (r = ${avgFemaleCorrelation.toFixed(3)}) and a
-            <strong>${avgMaleCorrelation > 0.5 ? 'strong' : avgMaleCorrelation > 0.3 ? 'moderate' : 'weak'} positive correlation</strong> in male mice (r = ${avgMaleCorrelation.toFixed(3)}).
-            ${avgFemaleCorrelation > avgMaleCorrelation ? 
-            'Female mice show a stronger correlation between temperature and activity compared to males.' : 
-            'Male mice show a stronger correlation between temperature and activity compared to females.'}
+            testing.
         </p>
+    `;
+
+    // Update correlation summary
+    document.getElementById('correlation-summary').innerHTML = `
         <p>
-            This suggests that ${avgFemaleCorrelation > 0.5 || avgMaleCorrelation > 0.5 ? 
-            'hotter mice do tend to move more, with body temperature rising as activity increases.' : 
-            'the relationship between body temperature and activity is not as strong as hypothesized, though there is some positive correlation.'}
+            1. <b>Positive Correlation:</b> Body temperature is positively correlated with activity level for both male and female mice.
+            <br>
+            2. <b>Cyclical Pattern:</b> Body temperature and activity level are tightly synchronized with the light-dark cycle, rising and falling in tandem over each 24-hour period.
+            <br>
+            3. <b>Estrus Effect:</b> Females in estrus show slightly different patterns of activity and temperature, with increased activity level and  body temperature during ovulation days.
         </p>
     `;
     
