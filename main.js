@@ -3,6 +3,8 @@ let femActData, femTempData, maleActData, maleTempData;
 let selectedGender = 'female';
 let selectedPeriod = '24h';
 let selectedMouse = 'average';
+let updateTimeout;
+
 
 // Constants
 const MINUTES_PER_HOUR = 60;
@@ -25,10 +27,10 @@ document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('gender-select').addEventListener('change', function() {
         selectedGender = this.value;
         
-        // Update mouse select options based on gender
         initializeMouseDropdown();
-        
-        updateVisualizations();
+    
+        clearTimeout(updateTimeout);
+        updateTimeout = setTimeout(updateVisualizations, 200);  // Debounce updates
     });
     
     document.getElementById('time-period').addEventListener('change', function() {
@@ -141,6 +143,50 @@ function updateVisualizations() {
     // Log update
     console.log(`Updated visualizations: Gender=${selectedGender}, Period=${selectedPeriod}, Mouse=${selectedMouse}`);
 }
+
+function updateTimeSeriesChart() {
+    const { actData, tempData } = getFilteredData();
+
+    // Ensure there’s valid data
+    if (!actData || !tempData || actData.length === 0 || tempData.length === 0) {
+        console.warn("No data available for time series update.");
+        return;
+    }
+
+    const combinedData = processTimeSeriesData(actData, tempData); // Extracted processing logic
+    const xScale = d3.scaleLinear().domain([0, combinedData.length - 1]).range([0, chartWidth]);
+    const yScaleTemp = d3.scaleLinear().domain(d3.extent(combinedData, d => d.temperature)).range([chartHeight, 0]);
+    const yScaleAct = d3.scaleLinear().domain([0, d3.max(combinedData, d => d.activity)]).range([chartHeight, 0]);
+
+    // Update the lines instead of recreating them
+    d3.select('.line-temp')
+        .datum(combinedData)
+        .transition().duration(500)  // Smooth transition
+        .attr('d', d3.line().x(d => xScale(d.minute)).y(d => yScaleTemp(d.temperature)).curve(d3.curveMonotoneX));
+
+    d3.select('.line-act')
+        .datum(combinedData)
+        .transition().duration(500)
+        .attr('d', d3.line().x(d => xScale(d.minute)).y(d => yScaleAct(d.activity)).curve(d3.curveMonotoneX));
+}
+
+function updateScatterPlot() {
+    const { actData, tempData } = getFilteredData();
+    const scatterData = processScatterData(actData, tempData); // Extracted processing logic
+
+    const xScale = d3.scaleLinear().domain(d3.extent(scatterData, d => d.temperature)).range([0, chartWidth]);
+    const yScale = d3.scaleLinear().domain([0, d3.max(scatterData, d => d.activity)]).range([chartHeight, 0]);
+
+    // Update existing points instead of removing/recreating
+    d3.selectAll('.dot')
+        .data(scatterData)
+        .transition().duration(500)
+        .attr('cx', d => xScale(d.temperature))
+        .attr('cy', d => yScale(d.activity))
+        .attr('fill', d => d.mouseId.startsWith('f') ? COLORS.female : COLORS.male);
+}
+
+
 
 // Process data based on current selection
 function getFilteredData() {
