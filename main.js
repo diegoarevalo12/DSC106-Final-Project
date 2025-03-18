@@ -1869,7 +1869,13 @@ function updateSummaryText() {
     // Calculate average correlations
     const avgFemaleCorrelation = d3.mean(femaleCorrelations, d => d.correlation);
     const avgMaleCorrelation = d3.mean(maleCorrelations, d => d.correlation);
-    
+
+    document.getElementById('white-box').innerHTML =
+        <p>
+            fdnfdn
+        </p>
+    ;
+
     // Update correlation summary
     document.getElementById('white-box').innerHTML = `
         <p>
@@ -1885,6 +1891,8 @@ function updateSummaryText() {
             2. <b>Cyclical Pattern:</b> Body temperature and activity level are tightly synchronized with the light-dark cycle, rising and falling in tandem over each 24-hour period.
             <br>
             3. <b>Estrus Effect:</b> Females in estrus show slightly different patterns of activity and temperature, with increased activity level and  body temperature during ovulation days.
+            <br>
+            4. <b>Individual Variation:</b> Although broad trends exist, individual mice show some variation in how bdy temperature and activity level correlate, particularly across the different days and gender. This points to the complex nature of physiological and behavioral rhythms in mice.
         </p>
     `;
     
