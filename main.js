@@ -116,7 +116,6 @@ function initializeVisualizations() {
     createScatterPlot();
     createDailyActivityChart();
     createDailyTempChart();
-    createGenderComparisonChart();
     createActivityHeatmap();
     updateSummaryText();
     
@@ -134,7 +133,6 @@ function updateVisualizations() {
     createScatterPlot();
     createDailyActivityChart();
     createDailyTempChart();
-    createGenderComparisonChart();
     createActivityHeatmap();
     updateSummaryText();
     
@@ -1456,161 +1454,6 @@ function createDailyTempChart() {
         .attr('text-anchor', 'middle')
         .style('font-weight', 'bold')
         .text(`${mouseLabel} Temperature - ${genderLabel}`);
-}
-
-// Create a gender comparison chart for temperature-activity correlation
-function createGenderComparisonChart() {
-    // Container dimensions
-    const container = document.getElementById('gender-comparison-chart');
-    const width = container.clientWidth;
-    const height = container.clientHeight || 400;
-    const margin = { top: 30, right: 30, bottom: 60, left: 60 };
-    const chartWidth = width - margin.left - margin.right;
-    const chartHeight = height - margin.top - margin.bottom;
-    
-    // Create SVG
-    const svg = d3.select('#gender-comparison-chart')
-        .append('svg')
-        .attr('width', width)
-        .attr('height', height);
-    
-    // Create chart group
-    const chart = svg.append('g')
-        .attr('transform', `translate(${margin.left}, ${margin.top})`);
-    
-    // Calculate correlations for each mouse
-    function calculateMouseCorrelation(actData, tempData, mouseId) {
-        const activities = actData.map(d => parseFloat(d[mouseId])).filter(v => !isNaN(v));
-        const temperatures = tempData.map(d => parseFloat(d[mouseId])).filter(v => !isNaN(v));
-        
-        // Use the minimum length of both arrays
-        const n = Math.min(activities.length, temperatures.length);
-        
-        if (n < 10) return 0; // Not enough data
-        
-        let sumAct = 0, sumTemp = 0, sumActTemp = 0, sumActSq = 0, sumTempSq = 0;
-        
-        for (let i = 0; i < n; i++) {
-            sumAct += activities[i];
-            sumTemp += temperatures[i];
-            sumActTemp += activities[i] * temperatures[i];
-            sumActSq += activities[i] * activities[i];
-            sumTempSq += temperatures[i] * temperatures[i];
-        }
-        
-        const numerator = n * sumActTemp - sumAct * sumTemp;
-        const denominator = Math.sqrt((n * sumActSq - sumAct * sumAct) * (n * sumTempSq - sumTemp * sumTemp));
-        
-        return denominator === 0 ? 0 : numerator / denominator;
-    }
-    
-    // Calculate correlations
-    const femaleIds = ['f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'f10', 'f11', 'f12', 'f13'];
-    const maleIds = ['m1', 'm2', 'm3', 'm4', 'm5', 'm6', 'm7', 'm8', 'm9', 'm10', 'm11', 'm12', 'm13'];
-    
-    const femaleCorrelations = femaleIds.map(id => {
-        return {
-            id,
-            correlation: calculateMouseCorrelation(femActData, femTempData, id)
-        };
-    });
-    
-    const maleCorrelations = maleIds.map(id => {
-        return {
-            id,
-            correlation: calculateMouseCorrelation(maleActData, maleTempData, id)
-        };
-    });
-    
-    // Calculate average correlations
-    const avgFemaleCorrelation = d3.mean(femaleCorrelations, d => d.correlation);
-    const avgMaleCorrelation = d3.mean(maleCorrelations, d => d.correlation);
-    
-    // Prepare data for the chart
-    const data = [
-        { gender: 'Female', value: avgFemaleCorrelation },
-        { gender: 'Male', value: avgMaleCorrelation }
-    ];
-    
-    // Create scales
-    const xScale = d3.scaleBand()
-        .domain(data.map(d => d.gender))
-        .range([0, chartWidth])
-        .padding(0.4);
-    
-    const yScale = d3.scaleLinear()
-        .domain([0, Math.max(avgFemaleCorrelation, avgMaleCorrelation) * 1.1])
-        .range([chartHeight, 0]);
-    
-    // Create color scale
-    const colorScale = d => d.gender === 'Female' ? COLORS.female : COLORS.male;
-    
-    // Add bars
-    chart.selectAll('.bar')
-        .data(data)
-        .enter()
-        .append('rect')
-        .attr('class', 'bar')
-        .attr('x', d => xScale(d.gender))
-        .attr('y', d => yScale(d.value))
-        .attr('width', xScale.bandwidth())
-        .attr('height', d => chartHeight - yScale(d.value))
-        .attr('fill', d => colorScale(d));
-    
-    // Add bar values
-    chart.selectAll('.bar-value')
-        .data(data)
-        .enter()
-        .append('text')
-        .attr('class', 'bar-value')
-        .attr('x', d => xScale(d.gender) + xScale.bandwidth() / 2)
-        .attr('y', d => yScale(d.value) - 5)
-        .attr('text-anchor', 'middle')
-        .style('font-size', '12px')
-        .text(d => d.value.toFixed(3));
-    
-    // Create axes
-    const xAxis = d3.axisBottom(xScale);
-    
-    const yAxis = d3.axisLeft(yScale)
-        .ticks(5);
-    
-    // Add axes to chart
-    chart.append('g')
-        .attr('class', 'x-axis')
-        .attr('transform', `translate(0, ${chartHeight})`)
-        .call(xAxis);
-    
-    chart.append('g')
-        .attr('class', 'y-axis')
-        .call(yAxis);
-    
-    // Add axis labels
-    chart.append('text')
-        .attr('class', 'y-axis-label')
-        .attr('transform', 'rotate(-90)')
-        .attr('x', -chartHeight / 2)
-        .attr('y', -margin.left + 15)
-        .style('text-anchor', 'middle')
-        .text('Correlation Coefficient (r)');
-    
-    // Add title
-    svg.append('text')
-        .attr('class', 'chart-title')
-        .attr('x', width / 2)
-        .attr('y', 15)
-        .attr('text-anchor', 'middle')
-        .style('font-weight', 'bold')
-        .text('Gender Comparison: Temperature-Activity Correlation');
-    
-    // Add interpretation
-    chart.append('text')
-        .attr('class', 'interpretation')
-        .attr('x', chartWidth / 2)
-        .attr('y', chartHeight + 40)
-        .attr('text-anchor', 'middle')
-        .style('font-size', '12px')
-        .text('Higher values indicate stronger correlation between temperature and activity');
 }
 
 // Create a heatmap to visualize activity patterns by hour and day
